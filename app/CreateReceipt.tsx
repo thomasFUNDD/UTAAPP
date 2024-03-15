@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity,SafeAreaView,ScrollView, StyleSheet, Modal, TouchableWithoutFeedback, SectionList, FlatList, } from 'react-native'
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, StyleSheet, Modal, TouchableWithoutFeedback, SectionList, FlatList, TouchableHighlight } from 'react-native'
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import PDFLib, { PDFDocument, PDFPage } from 'react-native-pdf-lib';
 
@@ -22,7 +22,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import FileViewer from 'react-native-file-viewer';
-
+import { Calendar } from 'react-native-calendars';
 
 import * as Linking from 'expo-linking';
 
@@ -63,8 +63,9 @@ const SendScreen = () => {
     const [activeFilter, setActiveFilter] = useState('all'); // 'in', 'out', or 'receipt'
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     let runningBalance = currentBalance; // Start with the initial balance
-    const [filteredTransactions, setFilteredTransactions] = useState(transactions);
+
     const { transactions } = useContext(OtherContext); // Fetch transactions from context
+    const [filteredTransactions, setFilteredTransactions] = useState(transactions);
 
     const [stickyHeader, setStickyHeader] = useState('');
     const flatListRef = useRef(null);
@@ -80,11 +81,13 @@ const SendScreen = () => {
     const [isDepositsInSelected, setIsDepositsInSelected] = useState(false);
     const [isTransactionsOutSelected, setIsTransactionsOutSelected] = useState(false);
 
-
-    
+    const [showCustomStartDatePicker, setShowCustomStartDatePicker] = useState(false);
+    const [showCustomEndDatePicker, setShowCustomEndDatePicker] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
         const handleFilter = (filterType) => {
         setActiveFilter(filterType);
+        
     };
 
 
@@ -102,30 +105,96 @@ const SendScreen = () => {
 
 
 
+      
+  const CustomDatePicker = ({ isVisible, onClose, onSelectDate }) => {
+    return (
+      <Modal visible={isVisible} transparent={true} animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={styles.pickerContainer}>
+            <Calendar
+              // Theme customization
+              theme={{
+                backgroundColor: '#ffffff',
+                calendarBackground: '#ffffff',
+                textSectionTitleColor: '#b6c1cd',
+                textSectionTitleDisabledColor: '#d9e1e8',
+                selectedDayBackgroundColor: '#a98e63', // Custom color for selected day background
+                selectedDayTextColor: '#ffffff', // Keeping selected day text color white for contrast
+                todayTextColor: '#a98e63', // Custom color for today's date
+                dayTextColor: '#2d4150',
+                textDisabledColor: '#d9e1e8',
+                dotColor: '#00adf5',
+                selectedDotColor: '#ffffff',
+                arrowColor: '#a98e63', // Custom color for navigation arrows
+                disabledArrowColor: '#d9e1e8',
+                monthTextColor: '#a98e63', // Custom color for month and year header text
+                indicatorColor: 'blue',
+                textDayFontFamily: 'monospace',
+                textMonthFontFamily: 'monospace',
+                textDayHeaderFontFamily: 'monospace',
+                textDayFontWeight: '300',
+                textMonthFontWeight: 'bold',
+                textDayHeaderFontWeight: '300',
+                textDayFontSize: 16,
+                textMonthFontSize: 16,
+                textDayHeaderFontSize: 16
+              }}
+              // Initially visible month. Default = now
+              current={new Date()}
+              // Callback that gets called on day press
+              onDayPress={(day) => {
+                onSelectDate(new Date(day.dateString));
+                onClose(); // Close the modal after selecting a date
+              }}
+              // Enable the option to swipe between months
+              enableSwipeMonths={true}
+            />
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
 
       const handleGeneratePDF = async (transactionsData) => {
-        console.log('handleGeneratePDF called');
+        console.log('handleGeneratePDF called with transactionsData count:', transactionsData.length);
+
         try {
-          // Filter transactions based on selected filters
+          // Log the initial state of the filters
+          console.log('isTodaySelected:', isTodaySelected, 'isDepositsInSelected:', isDepositsInSelected, 'isTransactionsOutSelected:', isTransactionsOutSelected);
+
+          // Correctly filter transactions based on selected filters and date range
           const filteredTransactions = transactionsData.filter(transaction => {
             const transactionDate = new Date(transaction.date);
-            const today = new Date();
-            const isToday = transactionDate.toDateString() === today.toDateString();
-            const isDeposit = transaction.type === 'Deposit'; // Assuming 'type' field exists and 'Deposit' indicates a deposit
-            const isTransactionOut = transaction.type === 'Withdrawal'; // Assuming 'type' field exists and 'Withdrawal' indicates a transaction out
-      
-            if (isTodaySelected && !isToday) {
-              return false;
-            }
-            if (isDepositsInSelected && !isDeposit) {
-              return false;
-            }
-            if (isTransactionsOutSelected && !isTransactionOut) {
-              return false;
-            }
-            return true;
+            const filterStartDate = new Date(startDate);
+            const filterEndDate = new Date(endDate);
+            filterEndDate.setHours(23, 59, 59, 999); // Set to the end of the day for comparison
+
+            // Check if transaction date falls within the start and end date range
+            const isWithinDateRange = transactionDate >= filterStartDate && transactionDate <= filterEndDate;
+
+            const isToday = transactionDate.toDateString() === new Date().toDateString();
+            const isDeposit = transaction.credit > 0;
+            const isTransactionOut = transaction.debit > 0;
+
+            // Apply combined filters
+            return isWithinDateRange &&
+                   ((!isTodaySelected || (isTodaySelected && isToday)) &&
+                    ((isDepositsInSelected && isDeposit) || (isTransactionsOutSelected && isTransactionOut)));
           });
-      
+
+          console.log('Filtered Transactions:', filteredTransactions);
+
+          if (filteredTransactions.length === 0) {
+            console.log('No transactions match the selected filters.');
+            setModalVisible(true); // Show the modal when no transactions match the filters
+            setErrorMessage("No filtered transactions found. Expand your search parameters."); // Set the error message to be displayed in the modal
+            return; // Early return if no transactions match the filters
+          }
+
           console.log('Sending POST request to server with filtered transactions...');
           const response = await fetch('https://app.utauk.org/dashboardSorting/createPDFMobile.php', {
             method: 'POST',
@@ -134,35 +203,31 @@ const SendScreen = () => {
             },
             body: JSON.stringify(filteredTransactions),
           });
-      
+
           console.log('POST request sent. Response status:', response.status);
           if (!response.ok) {
             console.error('Server response error:', response.status, response.statusText);
             return;
           }
-      
+
           console.log('Attempting to download PDF data...');
           const blob = await response.blob();
           const pdfPath = FileSystem.cacheDirectory + 'receipts.pdf';
           const reader = new FileReader();
           reader.onloadend = async () => {
             try {
-              // Check if the result includes the base64 header
-              const base64data = reader.result.indexOf('base64,') >= 0 ?
-                reader.result.split('base64,')[1] :
-                reader.result;
-      
+              const base64data = reader.result.split(',')[1]; // Extract base64 data from the result
               await FileSystem.writeAsStringAsync(pdfPath, base64data, {
                 encoding: FileSystem.EncodingType.Base64,
               });
               console.log('PDF downloaded to:', pdfPath);
-      
+
               // Check if sharing is available
               if (!(await Sharing.isAvailableAsync())) {
                 console.error('Sharing is not available on this platform');
                 return;
               }
-      
+
               // Share the file
               await Sharing.shareAsync(pdfPath);
             } catch (error) {
@@ -192,7 +257,6 @@ const SendScreen = () => {
 
 
 
-
     const renderHeader = () => {
         return (
             <View style={styles.headerContainer}>
@@ -206,7 +270,7 @@ const SendScreen = () => {
                         style={styles.backIcon}
                     />
                 </TouchableOpacity>
-                <Text style={styles.title}>Create Reciepfs</Text>
+                <Text style={styles.title}>Create Reciepts</Text>
                 <TouchableOpacity>
             <Image
                 source={icons.more}
@@ -241,78 +305,96 @@ const SendScreen = () => {
   };
     
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.primary }}>
-      <View style={{ flex: 1, backgroundColor: COLORS.white }}>
-        {renderHeader()}
-        <View style={styles.container}>
-        <View style={styles.datePickerContainer}>
-  <Text style={styles.dateLabel}>Start Date:</Text>
-  <TouchableOpacity onPress={() => setShowStartDatePicker(true)} style={styles.dateInput}>
-    <Text style={styles.dateText}>{startDate.toLocaleDateString()}</Text>
-  </TouchableOpacity>
-</View>
-        {showStartDatePicker && (
-          <DateTimePicker
-            value={startDate}
-            mode="date"
-            display="default"
-            onChange={(event, selectedDate) => {
-              setShowStartDatePicker(false);
-              if (selectedDate) {
-                setStartDate(selectedDate);
-              }
-            }}
-          />
-        )}
+    <>
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.primary }}>
+        <View style={{ flex: 1, backgroundColor: COLORS.white }}>
+          {renderHeader()}
+          <View style={styles.container}>
+          <View style={styles.datePickerCdontainer}>
+    <Text style={styles.dateLabel}>Start Date:</Text>
+    <TouchableOpacity onPress={() => setShowCustomStartDatePicker(true)} style={styles.dateInput}>
+      <Text style={styles.dateText}>{startDate.toLocaleDateString()}</Text>
+    </TouchableOpacity>
+  </View>
+          {showCustomStartDatePicker && (
+            <CustomDatePicker
+              isVisible={showCustomStartDatePicker}
+              onClose={() => setShowCustomStartDatePicker(false)}
+              onSelectDate={(date) => {
+                setStartDate(date);
+                setShowCustomStartDatePicker(false);
+              }}
+            />
+          )}
 
-<View style={styles.datePickerContainer}>
-  <Text style={styles.dateLabel}>End Date:</Text>
-  <TouchableOpacity onPress={() => setShowEndDatePicker(true)} style={styles.dateInput}>
-    <Text style={styles.dateText}>{endDate.toLocaleDateString()}</Text>
-  </TouchableOpacity>
-</View>
-        {showEndDatePicker && (
-          <DateTimePicker
-            value={endDate}
-            mode="date"
-            display="default"
-            onChange={(event, selectedDate) => {
-              setShowEndDatePicker(false);
-              if (selectedDate) {
-                setEndDate(selectedDate);
-              }
-            }}
-          />
-        )}
-  
-  <View style={styles.switchContainer}>
-  <TouchableOpacity
-    style={[styles.switchButton, isTodaySelected && styles.activeSwitchButton]}
-    onPress={() => setIsTodaySelected(!isTodaySelected)}>
-    <Text style={isTodaySelected ? styles.activeSwitchText : styles.switchText}>Today</Text>
-  </TouchableOpacity>
+  <View style={styles.datePickerContainer}>
+    <Text style={styles.dateLabel}>End Date:</Text>
+    <TouchableOpacity onPress={() => setShowCustomEndDatePicker(true)} style={styles.dateInput}>
+      <Text style={styles.dateText}>{endDate.toLocaleDateString()}</Text>
+    </TouchableOpacity>
+  </View>
+          {showCustomEndDatePicker && (
+            <CustomDatePicker
+              isVisible={showCustomEndDatePicker}
+              onClose={() => setShowCustomEndDatePicker(false)}
+              onSelectDate={(date) => {
+                setEndDate(date);
+                setShowCustomEndDatePicker(false);
+              }}
+            />
+          )}
+    
+    <View style={styles.switchContainer}>
+    <TouchableOpacity
+      style={[styles.switchButton, isTodaySelected && styles.activeSwitchButton]}
+      onPress={() => setIsTodaySelected(!isTodaySelected)}>
+      <Text style={isTodaySelected ? styles.activeSwitchText : styles.switchText}>Today</Text>
+    </TouchableOpacity>
 
-  <TouchableOpacity
-    style={[styles.switchButton, isDepositsInSelected && styles.activeSwitchButton]}
-    onPress={() => setIsDepositsInSelected(!isDepositsInSelected)}>
-    <Text style={isDepositsInSelected ? styles.activeSwitchText : styles.switchText}>Deposits In</Text>
-  </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.switchButton, isDepositsInSelected && styles.activeSwitchButton]}
+      onPress={() => setIsDepositsInSelected(!isDepositsInSelected)}>
+      <Text style={isDepositsInSelected ? styles.activeSwitchText : styles.switchText}>Deposits In</Text>
+    </TouchableOpacity>
 
-  <TouchableOpacity
-    style={[styles.switchButton, isTransactionsOutSelected && styles.activeSwitchButton]}
-    onPress={() => setIsTransactionsOutSelected(!isTransactionsOutSelected)}>
-    <Text style={isTransactionsOutSelected ? styles.activeSwitchText : styles.switchText}>Transactions Out</Text>
+    <TouchableOpacity
+      style={[styles.switchButton, isTransactionsOutSelected && styles.activeSwitchButton]}
+      onPress={() => setIsTransactionsOutSelected(!isTransactionsOutSelected)}>
+      <Text style={isTransactionsOutSelected ? styles.activeSwitchText : styles.switchText}>Transactions Out</Text>
+    </TouchableOpacity>
+  </View>
+          <Text style={styles.instructionText}>
+          Please select a date range to generate a PDF document of receipts.
+        </Text>
+        <TouchableOpacity style={styles.fullWidthButton} onPress={requestStoragePermissionAndGeneratePDF}>
+    <Text style={styles.buttonText}>Generate PDF</Text>
   </TouchableOpacity>
-</View>
-        <Text style={styles.instructionText}>
-        Please select a date range to generate a PDF document of receipts.
-      </Text>
-      <TouchableOpacity style={styles.fullWidthButton} onPress={requestStoragePermissionAndGeneratePDF}>
-  <Text style={styles.buttonText}>Generate PDF</Text>
-</TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+      <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => {
+              setModalVisible(!modalVisible);
+          }}
+      >
+          <View style={styles.centeredView}>
+              <View style={styles.modalView}>
+                  <Text style={styles.modalText}>{errorMessage}</Text>
+                  <TouchableHighlight
+                      style={styles.openButton}
+                      onPress={() => {
+                          setModalVisible(!modalVisible);
+                      }}
+                  >
+                      <Text style={styles.textStyle}>Close</Text>
+                  </TouchableHighlight>
+              </View>
+          </View>
+      </Modal>
+    </>
   );
 }
 
@@ -862,6 +944,65 @@ dateLabel: {
   fontSize: 16, // Adjust the font size as needed
   marginBottom: 5, // Space between label and input
   alignSelf: 'center', // Center align the label text
+},
+modalContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  pickerContainer: {
+  backgroundColor: 'white',
+  borderRadius: 20,
+  padding: 20,
+  width: '80%',
+  maxHeight: '60%',
+  },
+  dateItem: {
+  padding: 10,
+  borderBottomWidth: 1,
+  borderBottomColor: '#ccc',
+  },
+  dateText: {
+  fontSize: 16,
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
+},
+modalView: {
+    margin: 20,
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 35,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+        width: 0,
+        height: 2
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5
+},
+modalText: {
+    marginBottom: 15,
+    textAlign: "center",
+    fontSize: 16, // Adjusted for better readability
+},
+openButton: {
+    backgroundColor: COLORS.primary, // A pleasant shade of pink; adjust as needed
+    borderRadius: 20,
+    padding: 10,
+    elevation: 2,
+    paddingHorizontal: 20, // Added for wider button
+},
+textStyle: {
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center"
 },
 })
 

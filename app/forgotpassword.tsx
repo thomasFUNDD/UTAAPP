@@ -68,14 +68,13 @@ const ForgotPassword = () => {
         <ScrollView>
           <Text style={styles.formTitle}>Forgot Password</Text>
           <View style={{ alignItems: "center" }}>
-            <Image
-              source={illustrations.forgetPassword}
-              contentFit='contain'
-              style={styles.illustration}
-            />
+          <View style={{ margin: '20%' }} />
+
+          
           </View>
           <Text style={styles.formSubtitle}>Enter your registered email below to receive</Text>
           <Text style={styles.formSubtitle}>password reset instruction</Text>
+          <View style={{ margin: '10%' }} />
           <View style={{ marginVertical: 32 }}>
             <InputLabel title="Email Address" />
             <Input
@@ -111,7 +110,7 @@ const styles = StyleSheet.create({
     marginVertical: 18,
   },
   formSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "regular",
     color: "black",
     textAlign: "center",

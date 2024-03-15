@@ -25,7 +25,7 @@ const Card: React.FC<CardProps> = ({ number, balance, date, onPress, containerSt
        </View>
        <Text style={styles.cardNumber}>{number}</Text>
        <View style={styles.footerContainer}>
-            <Text style={styles.balance}>${balance}</Text>
+            <Text style={styles.balance}>£{balance}</Text>
             <Text style={styles.date}>{date}</Text>
        </View>
        <Image

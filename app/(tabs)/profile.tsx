@@ -10,6 +10,10 @@ import { ScrollView } from 'react-native-virtualized-view'
 import Button from '../../components/Button'
 import { launchImagePicker } from '../../utils/ImagePickerHelper'
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import otherContext from '../../data/otherContext';
+import otherContextProvider from '../../data/otherContextProvider';
+import OtherContext from '../../data/otherContext';
+import { useContext } from 'react';
 type Nav = {
   navigate: (value: string) => void
 }
@@ -18,6 +22,8 @@ const ProfileScreen = () => {
   const { navigate } = useNavigation<Nav>();
   const [modalVisible, setModalVisible] = useState(false);
   const [image, setImage] = useState<any>(null);
+  const { setPanNumber } = useContext(OtherContext);
+
 
   const pickImage = async () => {
     try {
@@ -57,14 +63,9 @@ const ProfileScreen = () => {
         >
           <View style={styles.modalContainer}>
             <View style={styles.modal}>
-              <Image
-                source={images.error}
-                contentFit='contain'
-                style={styles.modalSuccess}
-              />
+           
               <Text style={styles.modalTitle}>Want to Logout ?</Text>
-              <Text style={styles.modalSubtitle}>You will back to early app if you
-                click the logout button</Text>
+             
                 <Button
   title="Logout Now"
   filled
@@ -73,6 +74,9 @@ const ProfileScreen = () => {
       await AsyncStorage.removeItem('userToken'); // Remove the userToken
       setModalVisible(false); // Close the modal
       navigate('login'); // Navigate to the login screen
+      setPanNumber(null); // Set panNumber to null on logout
+
+      
     } catch (error) {
       // Handle error, if removal failed
       console.error('Failed to remove the user token.', error);
@@ -99,29 +103,19 @@ const ProfileScreen = () => {
       
           </View>
           <View style={styles.settingsContainer}>
-            <Text style={styles.subtitle}>Account</Text>
-            <ProfileItem
-              title="Contact support"
-              icon={icons.email}
-              onPress={() => navigate("changeemail")}
-            />
-            <ProfileItem
-              title="Change Password"
-              icon={icons.lock}
-              onPress={() => navigate("changepassword")}
-            />
+   
             
-            <Text style={styles.subtitle}>More Settings</Text>
-      
-            <ProfileItem
-              title="Help and Privacy"
-              icon={icons.question}
-              onPress={() => navigate("helpcenter")}
-            />
+
+   
 
 
-<ProfileItem
-              title="Order Books"
+<Text style={styles.subtitle}>Account</Text>
+  
+
+
+
+   <ProfileItem
+              title="Order Voucher Books"
               icon={icons.voucher}
               onPress={() => navigate("orderVouchers")}
             />
@@ -140,7 +134,24 @@ const ProfileScreen = () => {
               onPress={() => navigate("viewVouchers")}
             />
 
-   
+<Text style={styles.subtitle}>Menu</Text>
+      
+      <ProfileItem
+        title="Help and Privacy"
+        icon={icons.question}
+        onPress={() => navigate("helpcenter")}
+      />
+
+<ProfileItem
+        title="Contact support"
+        icon={icons.email}
+        onPress={() => navigate("changeemail")}
+      />
+      <ProfileItem
+        title="Change Password"
+        icon={icons.lock}
+        onPress={() => navigate("changepassword")}
+      />
             <TouchableOpacity
               onPress={() => setModalVisible(true)}
               style={styles.btn}>

@@ -16,6 +16,10 @@ const OtherContext = React.createContext({
   setVoucherDetails: () => {}, // Add this line for the setter function
   accountDetails: {}, // Add this line for account details
   setAccountDetails: () => {}, // Add this line for account details
+  panNumber: null, // Add this line for account details
+  setPanNumber: () => {}, // Add this line for account details
+  uniqueCharities: {}, // Add this line
+  setUniqueCharities: () => {}, // Add this line
 });
 
 

@@ -18,6 +18,11 @@ import icons from '../constants/icons'; // Adjust the import path as necessary
 import { API_URL, TOKEN } from '@env' // Import environment variables
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+
+import AsyncStorage from '@react-native-async-storage/async-storage'
+
+import BalanceContext from '../data/balancesContext'; // Adjust the path as necessary
+import OtherContext from '../data/otherContext'; // Adjust the import path as necessary
 type Nav = {
     navigate: (value: string) => void
 }
@@ -93,7 +98,8 @@ const [quantity50x72, setQuantity50x72] = useState(0);
 const [quantity50x100, setQuantity50x100] = useState(0);
 const [quantity0x50, setQuantity0x50] = useState(0);
 const navigation = useNavigation();
-
+const [modalVisible, setModalVisible] = useState(false);
+const [modalMessage, setModalMessage] = useState('');
 const [isBasketModalVisible, setBasketModalVisible] = useState(false);
 const [total, setTotal] = useState(0);// Define more quantities as needed
 
@@ -134,22 +140,47 @@ const submitOrder = async () => {
     const filteredOrderItems = orderItems.filter(item => item.quantity > 0);
     const payload = filteredOrderItems;
 
+    const token = await AsyncStorage.getItem('userToken');
+    console.log('Retrieved token:', token); // Add this line to check the token value
+
     try {
-        const response = await fetch(`${API_URL}/client/distributions/pay`, {
-            method: 'POST',
+        const response = await axios.post(`${API_URL}/client/books/order`, payload, {
             headers: {
                 'Content-Type': 'application/json',
-                // Include other headers as required by your API
+                Authorization: `Bearer ${token}`, // Ensure token is correctly included
             },
-            body: JSON.stringify(payload),
         });
 
-        const jsonResponse = await response.json();
-        console.log(jsonResponse);
-        Alert.alert('Success', 'Order submitted successfully');
+        console.log(response.data);
+
+        if (response.status === 200 || response.status === 201) {
+            setModalMessage('Order submitted successfully');
+            setQuantity100x50p(0);
+            setQuantity50x1(0);
+            setQuantity50x2(0);
+            setQuantity50x3(0);
+            setQuantity50x5(0);
+            setQuantity50x10(0);
+            setQuantity50x15(0);
+            setQuantity50x18(0);
+            setQuantity50x20(0);
+            setQuantity50x25(0);
+            setQuantity50x36(0);
+            setQuantity50x50(0);
+            setQuantity50x72(0);
+            setQuantity50x100(0);
+            setQuantity0x50(0);
+    
+        } else {
+            console.log(response);
+            setModalMessage('Failed to submit order');
+        }
+
+        setModalVisible(true);
     } catch (error) {
         console.error(error);
-        Alert.alert('Error', 'Failed to submit order');
+        setModalMessage('Failed to submit order');
+        setModalVisible(true);
     }
 };
 
@@ -177,21 +208,23 @@ const renderHeader = () => {
     )
 }
 
-const calculateTotal = () => {
+const calculateTotal = useCallback(() => {
     let total = 0;
     items.forEach(item => {
         total += item.quantity * item.price;
     });
     setTotal(total);
-};
+}, [items]);
 
-const openBasketModal = () => {
+const openBasketModal = useCallback(() => {
     setBasketModalVisible(true);
-};
-const closeBasketModal = () => {
+}, []);
+
+const closeBasketModal = useCallback(() => {
     setBasketModalVisible(false);
-};
-  function updateQuantity(itemId: string, quantity: number) {
+}, []);
+
+  const updateQuantity = useCallback((itemId: string, quantity: number) => {
     switch(itemId) {
         case '1':
             setQuantity100x50p(quantity);
@@ -243,44 +276,93 @@ const closeBasketModal = () => {
     }
     calculateTotal();
 
-}
+}, [setQuantity100x50p, setQuantity50x1, setQuantity50x2, setQuantity50x3, setQuantity50x5, setQuantity50x10, setQuantity50x15, setQuantity50x18, setQuantity50x20, setQuantity50x25, setQuantity50x36, setQuantity50x50, setQuantity50x72, setQuantity50x100, setQuantity0x50]);
 
-
-    const categories = ['Pre-Paid vouchers', 'Pre-Printed Voucher Books', 'Blank voucher books', 'All'];
+const categories = ['Pre-Paid vouchers', 'Pre-Printed Voucher Books', 'Blank voucher books', 'All'];
 const [selectedCategory, setSelectedCategory] = useState(categories[0]);
 
-    const inputChangedHandler = useCallback(
-        (inputId: string, inputValue: string) => {
-            const result = validateInput(inputId, inputValue)
-            dispatchFormState({
-                inputId,
-                validationResult: result,
-                inputValue,
-            })
-        },
-        [dispatchFormState]
-    )
+const inputChangedHandler = useCallback(
+    (inputId: string, inputValue: string) => {
+        const result = validateInput(inputId, inputValue)
+        dispatchFormState({
+            inputId,
+            validationResult: result,
+            inputValue,
+        })
+    },
+    [dispatchFormState]
+)
 
-    useEffect(() => {
-        calculateTotal();
-    }, [
-        quantity100x50p, quantity50x1, quantity50x2, quantity50x3, quantity50x5,
-        quantity50x10, quantity50x15, quantity50x18, quantity50x20, quantity50x25,
-        quantity50x36, quantity50x50, quantity50x72, quantity50x100, quantity0x50
-    ]);
+useEffect(() => {
+    calculateTotal();
+}, [
+    quantity100x50p, quantity50x1, quantity50x2, quantity50x3, quantity50x5,
+    quantity50x10, quantity50x15, quantity50x18, quantity50x20, quantity50x25,
+    quantity50x36, quantity50x50, quantity50x72, quantity50x100, quantity0x50
+]);
 
-    const filteredItems = useMemo(() => {
-        return items.filter(item => selectedCategory === 'All' || item.category === selectedCategory);
-    }, [items, selectedCategory]);
+const filteredItems = useMemo(() => {
+    return items.filter(item => selectedCategory === 'All' || item.category === selectedCategory);
+}, [items, selectedCategory]);
 
-    const pickerItems = useMemo(() => {
-        return [...Array(51).keys()].map((value) => (
-            <Picker.Item key={value} label={value.toString()} value={value} />
-        ));
-    }, []);
+const pickerItems = useMemo(() => {
+    return [...Array(51).keys()].map((value) => (
+        <Picker.Item key={value} label={value.toString()} value={value} />
+    ));
+}, []);
+
+const VoucherItem = React.memo(({ item, onQuantityChange }) => {
+    return (
+        <View style={styles.itemContainer}>
+            <Text>{item.title}</Text>
+            <Text>{item.category}</Text>
+            <View style={styles.quantityControlRow}>
+                <TouchableOpacity 
+                    onPress={() => onQuantityChange(item.id, Math.max(0, item.quantity - 1))}
+                    style={styles.iconButton}
+                >
+                    <Icon name="remove" size={24} color="black" />
+                </TouchableOpacity>
+                <Picker
+                    selectedValue={item.quantity}
+                    onValueChange={(itemValue) => onQuantityChange(item.id, itemValue)}
+                    style={styles.quantityPicker}
+                >
+                    {pickerItems}
+                </Picker>
+                <TouchableOpacity 
+                    onPress={() => onQuantityChange(item.id, item.quantity + 1)}
+                    style={styles.iconButton}
+                >
+                    <Icon name="add" size={24} color="black" />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+});
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.primary }}>
            {renderHeader()}
+
+           <Modal
+    visible={modalVisible}
+    transparent={true}
+    animationType="fade"
+    onRequestClose={() => setModalVisible(false)}
+>
+    <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+            <Text style={styles.modalMessage}>{modalMessage}</Text>
+            <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setModalVisible(false)}
+            >
+                <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+        </View>
+    </View>
+</Modal>
            <View style={styles.shoppingView}>
             <ScrollView style={{ marginHorizontal: 16 }}>
                 <Text style={styles.header}>Order Books</Text>
@@ -295,34 +377,11 @@ const [selectedCategory, setSelectedCategory] = useState(categories[0]);
                 <FlatList
     data={filteredItems}
     renderItem={({ item }) => (
-        <View style={styles.itemContainer}>
-            <Text>{item.title}</Text>
-            <Text>{item.category}</Text>
-            <View style={styles.quantityControlRow}>
-                <TouchableOpacity 
-                    onPress={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
-                    style={styles.iconButton}
-                >
-                    <Icon name="remove" size={24} color="black" />
-                </TouchableOpacity>
-                <Picker
-                    selectedValue={item.quantity}
-                    onValueChange={(itemValue) => updateQuantity(item.id, itemValue)}
-                    style={styles.quantityPicker}
-                >
-                    {pickerItems}
-                </Picker>
-                <TouchableOpacity 
-                    onPress={() => updateQuantity(item.id, item.quantity + 1)}
-                    style={styles.iconButton}
-                >
-                    <Icon name="add" size={24} color="black" />
-                </TouchableOpacity>
-            </View>
-        </View>
+        <VoucherItem item={item} onQuantityChange={updateQuantity} />
     )}
     keyExtractor={item => item.id}
     numColumns={1}
+    extraData={selectedCategory}
 />
             </ScrollView>
             <View style={styles.footer}>
@@ -581,7 +640,32 @@ const styles = StyleSheet.create({
         width: '65%', // Adjust the width as needed
         // You might want to set a specific height for the picker
     },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        padding: 20,
+        borderRadius: 10,
+    },
+    modalMessage: {
+        fontSize: 16,
+        marginBottom: 10,
+    },
+    modalButton: {
+        backgroundColor: '#a98e63',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 5,
+    },
+    modalButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+    },
 
 })
 
-export default AddNewCardScreen
+export default AddNewCardScreen 

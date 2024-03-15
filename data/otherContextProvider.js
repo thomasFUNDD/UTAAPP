@@ -12,7 +12,9 @@ const OtherContextProvider = ({ children }) => {
 
   const [accountDetails, setAccountDetails] = useState([]); // Add this line for card details state
 
+  const [panNumber, setPanNumber] = useState(null); // Initialize as null or appropriate default value
 
+  const [uniqueCharities, setUniqueCharities] = useState(null); // Initialize as null or appropriate default value
   // Add more state as needed
 
   // Create a value object that holds all state and setters
@@ -30,7 +32,11 @@ const OtherContextProvider = ({ children }) => {
     voucherDetails,
     setVoucherDetails,
     accountDetails,
-    setAccountDetails
+    setAccountDetails,
+    panNumber,
+    setPanNumber,
+    uniqueCharities,
+    setUniqueCharities,
     // Add more pairs of data and setters here
   };
 

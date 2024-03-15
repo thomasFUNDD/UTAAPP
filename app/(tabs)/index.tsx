@@ -1,6 +1,8 @@
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import React, { useState, useEffect, useContext, memo } from 'react';
-import { FlatList } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated,FlatList } from 'react-native';
+import React, { useState, useEffect, useContext, memo,useCallback } from 'react';
+import '../../sentry-config'; // Path to your Sentry configuration file
+
+// ... other imports
 import { COLORS, images } from '../../constants'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
@@ -29,20 +31,14 @@ import { Ionicons } from 'react-native-vector-icons';
 import { Menu, Button } from 'react-native-paper';
 
 
-
-
- // Adjust the path as necessary
-
-
-
 export interface BalanceContextType {
   currentBalance: number;
   setCurrentBalance: (balance: number) => void;
 }
 
 type Nav = {
-  navigate: (value: string) => void
-}
+  navigate: (value: string) => void;
+};
 
 const SearchBar = ({ onSearch }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,36 +63,24 @@ const SearchBar = ({ onSearch }) => {
   );
 };
 
-const TransactionModalContent = memo(({ transaction }) => {
-  // Transaction details components
-  return (
-    <>
-      <Text style={modalStyles.modalText}>Transaction Details</Text>
-      {/* ... other transaction details */}
-    </>
-  );
-});
-
 const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
   const [isContentLoaded, setContentLoaded] = useState(false);
 
   useEffect(() => {
-    // Placeholder for any setup that needs to happen when the modal is visible.
+    // Placeholder for any setup that needs to happen when the modal is visible
   }, [isVisible]);
 
-  // Function to format the display of each transaction property
   const formatTransactionDetail = (key, value) => {
-    let formattedKey = key.replace(/_/g, ' '); // Replace underscores with spaces
-    formattedKey = formattedKey.charAt(0).toUpperCase() + formattedKey.slice(1); // Capitalize the first letter
+    let formattedKey = key.replace(/_/g, ' ');
+    formattedKey = formattedKey.charAt(0).toUpperCase() + formattedKey.slice(1);
 
-    // Handle specific value formatting here if necessary
     let formattedValue = value;
     if (key === 'date') {
       formattedValue = new Date(value).toLocaleDateString('en-GB');
     } else if ((key === 'credit' || key === 'debit') && value > 0) {
       formattedValue = `£${value.toFixed(2)}`;
     } else if (key === 'credit' || key === 'debit') {
-      return null; // Do not display credit/debit if value is not greater than 0
+      return null;
     } else if (key === 'tt_id') {
       switch (value) {
         case 'CO':
@@ -112,7 +96,7 @@ const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
           formattedValue = 'NVTS';
           break;
         default:
-          formattedValue = value; // Default case if none of the above matches
+          formattedValue = value;
       }
     }
 
@@ -132,11 +116,7 @@ const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
   });
 
   return (
-    <Modal
-      transparent={true}
-      visible={isVisible}
-      onRequestClose={onRequestClose}
-    >
+    <Modal transparent={true} visible={isVisible} onRequestClose={onRequestClose}>
       <View style={modalStyles.centeredView}>
         <View style={modalStyles.modalView}>
           {transaction ? (
@@ -144,10 +124,7 @@ const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
           ) : (
             <Text>No transaction data available.</Text>
           )}
-          <TouchableOpacity
-            style={modalStyles.button}
-            onPress={onRequestClose}
-          >
+          <TouchableOpacity style={modalStyles.button} onPress={onRequestClose}>
             <Text>Close</Text>
           </TouchableOpacity>
         </View>
@@ -158,287 +135,364 @@ const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
 
 const HomeScreen = () => {
   const { navigate } = useNavigation<Nav>();
-
   const route = useRoute();
   const [userToken, setUserToken] = useState(null);
-  const [fullName, setFullName] = useState(''); // State to store the full name
-
+  const [fullName, setFullName] = useState('');
   const [vaccountno, setVaccountno] = useState('');
   const { currentBalance, setCurrentBalance } = useContext<BalanceContextType>(BalanceContext);
-    const { setCharities } = useContext(OtherContext);
-
-    const [isModalVisible, setIsModalVisible] = useState(false);
+  const { setCharities } = useContext(OtherContext);
+  const { setUniqueCharities } = useContext(OtherContext);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const { statements, setStatements } = useContext(OtherContext);
   const { standingOrders, setStandingOrders } = useContext(OtherContext);
-  const { transactions, setTransactions} = useContext(OtherContext);
-  const { voucherDetails, setVoucherDetails} = useContext(OtherContext);
-
+  const { transactions, setTransactions } = useContext(OtherContext);
+  const { voucherDetails, setVoucherDetails } = useContext(OtherContext);
   const { accountDetails, setAccountDetails } = useContext(OtherContext);
   const [logoutTimeLeft, setLogoutTimeLeft] = useState('');
   const [timeLeft, setTimeLeft] = useState('');
-  const [timeLeftIcon, setTimeLeftIcon] = useState(TimeFullIcon); // State to hold the current icon
-
-
+  const [timeLeftIcon, setTimeLeftIcon] = useState(TimeFullIcon);
   const { setCardDetails } = useContext(OtherContext);
+  const { panNumber, setPanNumber } = useContext(OtherContext);
+  let runningBalance = currentBalance;
 
-  let runningBalance = currentBalance; // Start with the current balance
-
-  
-    // Define showTransactionModal inside the HomeScreen component
-    const showTransactionModal = (transaction) => {
+  const showTransactionModal = useCallback(
+    (transaction) => {
       requestAnimationFrame(() => {
         setSelectedTransaction(transaction);
         setIsModalVisible(true);
       });
-    };
-    
-    const hideModal = () => {
-      requestAnimationFrame(() => {
-        setIsModalVisible(false);
-        setSelectedTransaction(null);
-      });
-    };
+    },
+    []
+  );
 
+  const hideModal = () => {
+    requestAnimationFrame(() => {
+      setIsModalVisible(false);
+      setSelectedTransaction(null);
+    });
+  };
 
+  const getTransactionIcon = (transaction) => {
+    const transactionType = transaction.tt_id.toLowerCase();
+    console.log('Normalized transaction type:', transactionType);
 
-    // Define the getTransactionIcon function within your component file, but outside of your component definition
-const getTransactionIcon = (transaction) => {
- 
-  switch (transaction.tt_id) { // Assuming 'type' is a property of your transaction object
-    
-    case 'donation':
-      return images.donationIcon; // Assuming you have a donationIcon in your images object
-      case 'NVTS':
-        return images.moneyBlack; // Assuming you have a donationIcon in your images object
+    switch (transactionType) {
+      case 'donation':
+        return images.transferMoney;
+      case 'nvts':
+        return images.moneyBlack;
+      case 'nv':
+        return images.cardTransaction;
+      case 'co':
+        return images.moneyBlack;
+      case 'vo':
+        return images.voucherIconProfile;
+      case 'ta':
+        return images.taxRefund;
+      case 'gift aid':
+        return images.taxRefund;
+      case 'gi':
+        return images.taxRefund;
+      default:
+        return images.transferMoney;
+    }
+  };
 
-        case 'NV':
-          return images.moneyBlack; // Assuming you have a donationIcon in your images object
-    case 'CO':
-      return images.moneyBlack; // Use the existing commission icon for commission transactions
-    case 'VO':
-      return images.voucherIconProfile; // Assuming you have a voucherIcon in your images object
-    // Add more cases as needed for different transaction types
-    case 'Ta':
-      return images.taxRefund; // Assuming you have a voucherIcon in your images object
-    default:
-      return images.defaultIcon; // A default icon for transactions without a specific type
-  }
-};
+  const TimeFullIcon = <Octicons name="person" size={28} color={COLORS.white} />;
+  const TimeHalfIcon = <Octicons name="clock" size={28} color={COLORS.white} />;
+  const TimeLowIcon = <Octicons name="alert" size={28} color={COLORS.white} />;
 
-const TimeFullIcon = <Octicons name="person" size={28} color={COLORS.white} />;
-const TimeHalfIcon = <Octicons name="clock" size={28} color={COLORS.white} />;
-const TimeLowIcon = <Octicons name="alert" size={28} color={COLORS.white} />;
+  const determineTimeLeftIcon = () => {
+    const minutesLeft = parseInt(timeLeft.split(':')[0], 10);
+    console.log('tre', minutesLeft);
+    if (minutesLeft > 10) {
+      return TimeFullIcon;
+    } else if (minutesLeft > 5) {
+      return TimeHalfIcon;
+    } else {
+      return TimeLowIcon;
+    }
+  };
 
-const determineTimeLeftIcon = () => {
-  const minutesLeft = parseInt(timeLeft.split(':')[0], 10);
+  const TimeLeftDisplay = () => {
+    const [timeLeft, setTimeLeft] = useState('');
 
-  if (minutesLeft > 10) {
-    return TimeFullIcon;
-  } else if (minutesLeft > 5) {
-    return TimeHalfIcon;
-  } else {
-    return TimeLowIcon;
-  }
-};
+    useEffect(() => {
+      const updateTimeLeft = async () => {
+        const storedTimeLeft = await AsyncStorage.getItem('timeLeft');
+        setTimeLeft(storedTimeLeft || 'No time left or not logged in');
+      };
 
-  
+      updateTimeLeft();
+      const intervalId = setInterval(updateTimeLeft, 1000);
+
+      return () => clearInterval(intervalId);
+    }, []);
+
+    const [minutes, seconds] = timeLeft.split(':').map(Number);
+    const totalSecondsLeft = minutes * 60 + seconds;
+
+    if (totalSecondsLeft <= 180) {
+      return (
+        <>
+          <Octicons name="person" size={28} color={COLORS.white} />
+          <Text style={styles.timeLeftStyle}>Time Left: {timeLeft}</Text>
+        </>
+      );
+    } else if (totalSecondsLeft < 1) {
+      AsyncStorage.removeItem('userToken');
+      AsyncStorage.setItem('dataFetched', 'false');
+      AsyncStorage.setItem('fullName', null);
+      navigate('login');
+    }
+
+    return <Octicons name="person" size={28} color={COLORS.white} />;
+  };
+
+  const [balanceAnimatedValue] = useState(new Animated.Value(0));
+  const [iconAnimatedValues] = useState(userCards.map(() => new Animated.Value(0)));
+
   useEffect(() => {
+    const checkAndFetchData = async () => {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('userToken:', token);
 
+      if (!token || token === '') {
+        AsyncStorage.removeItem('userToken');
+        AsyncStorage.setItem('fullName', null);
+        AsyncStorage.setItem('dataFetched', 'false');
+        navigate('login');
+      }
+      console.log('fullName:', fullName);
+      const dataFetched = await AsyncStorage.getItem('dataFetched');
+      console.log('dataFetched:', dataFetched);
+      if (token) {
+        await fetchData();
+        await AsyncStorage.setItem('dataFetched', 'true');
+      } else if (!fullName) {
+        console.log(fullName);
+        await fetchData();
+        await AsyncStorage.setItem('dataFetched', 'true');
+      }
 
-    const updateTimeLeft = async () => {
-      const storedTimeLeft = await AsyncStorage.getItem('timeLeft');
-      if (storedTimeLeft) {
-        setTimeLeft(storedTimeLeft);
-        // Update the icon based on time left
-        const minutesLeft = parseInt(storedTimeLeft.split(':')[0], 10);
-        if (minutesLeft > 10) {
-          setTimeLeftIcon(TimeFullIcon);
-        } else if (minutesLeft > 5) {
-          setTimeLeftIcon(TimeHalfIcon);
-        } else {
-          setTimeLeftIcon(TimeLowIcon);
-        }
-      } else {
-        setTimeLeft('Logging out soon...');
-        setTimeLeftIcon(TimeLowIcon);
+      if (!token) {
+        AsyncStorage.removeItem('userToken');
+        await AsyncStorage.setItem('dataFetched', 'false');
+        navigate('login');
       }
     };
 
+    checkAndFetchData();
 
     const processTransactions = (transactions, balance) => {
       if (!Array.isArray(transactions)) {
         console.error('Expected transactions to be an array, received:', transactions);
         return [];
       }
-    
-      const transactionsWithBalance = transactions.map(transaction => {
+
+      const transactionsWithBalance = transactions.map((transaction) => {
         return { ...transaction, balance };
       });
-    
+
       return transactionsWithBalance;
     };
-    
-    
+
     const calculateTimeLeft = async () => {
       const logoutTimestamp = await AsyncStorage.getItem('logoutTimestamp');
       if (logoutTimestamp) {
         const currentTime = new Date().getTime();
         const timeLeft = parseInt(logoutTimestamp) - currentTime;
 
+        console.log(panNumber);
         if (timeLeft > 0) {
-          // Update every second
           setTimeout(() => {
-            const minutes = Math.floor((timeLeft / 1000) / 60);
+            const minutes = Math.floor(timeLeft / 1000 / 60);
             const seconds = Math.floor((timeLeft / 1000) % 60);
             setLogoutTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
           }, 1000);
         } else {
-          // Handle logout
           AsyncStorage.removeItem('userToken');
+          setPanNumber(null);
+          await AsyncStorage.setItem('dataFetched', 'false');
           navigate('login');
         }
       }
     };
-    
+
     const fetchData = async () => {
       const token = await AsyncStorage.getItem('userToken');
-      if (token) {
-        const headers = {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        };
     
-        const reqs = [
-          { "url": `${API_URL}/client/accounts/general`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/client/accounts/balances`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/client/distributions/nvts`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/client/statements`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/client/distributions/charities`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/client/vouchers/unused`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/webdata/standingorders/unprocessed`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/qpay/cards/details`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/client/accounts/transactions/filtered?count=9999&type=all`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/webdata/standingorders/unprocessed`, "method": "get", "headers": headers },
-          { "url": `${API_URL}/qpay/cards/pan`, "method": "GET", "headers": headers }
-        ];
-        try {
-          const responses = await Promise.all(reqs.map(req => axios({
-            method: req.method,
-            url: req.url,
-            headers: req.headers,
-          }).then(response => {
-            console.log(`Successful response from: ${req.url}`); // Log successful response
-
-            return response;
-          }).catch(error => {
-            if (error.response && error.response.status === 417 && 
-                (req.url.includes('/qpay/cards/details') || req.url.includes('/qpay/cards/pan'))) {
-              return { data: { cards: [] }, status: 417 };
-            } else {
-              throw error;
-            }
-          })));
+      if (!token) {
+        Alert.alert('No userToken', 'userToken is not set');
+        return;
+      }
     
-
-          const generalInfo = responses[0].data.general[0];
-          const fullName = `${generalInfo.firstname} ${generalInfo.lastname}`;
-          const balanceInfo = responses[1].data.balances[0];
-          
-          setCurrentBalance(balanceInfo.currentbalance);
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
     
-          const statementsResponse = responses[3].data;
-          if (Array.isArray(statementsResponse)) {
-            setStatements(statementsResponse);
-          }
+      const urls = [
+        `${API_URL}/client/accounts/general`,
+        `${API_URL}/client/accounts/balances`,
+        `${API_URL}/client/distributions/nvts`,
+        `${API_URL}/client/statements`,
+        `${API_URL}/client/distributions/charities`,
+        `${API_URL}/client/vouchers/unused`,
+        `${API_URL}/webdata/standingorders/unprocessed`,
+        `${API_URL}/qpay/cards/details`,
+        `${API_URL}/client/accounts/transactions/filtered?count=9999&type=all`,
+        `${API_URL}/webdata/standingorders/unprocessed`,
+        `${API_URL}/qpay/cards/pan`,
+      ];
     
-          const accountDetailsResponse = responses[0].data;
-          if (accountDetailsResponse.general && Array.isArray(accountDetailsResponse.general)) {
-            setAccountDetails(accountDetailsResponse.general[0]);
-          }
+      try {
+        const responses = await Promise.all(
+          urls.map((url) =>
+            axios.get(url, { headers }).catch((error) => {
+              if (
+                error.response &&
+                error.response.status === 417 &&
+                (url.includes('/qpay/cards/details') || url.includes('/qpay/cards/pan'))
+              ) {
+                return { data: { cards: [] }, status: 417 };
+              } else {
+                throw error;
+              }
+            })
+          )
+        );
     
-          const voucherDetails = responses[5].data;
-          if (voucherDetails && Array.isArray(voucherDetails.book_categories)) {
-            setVoucherDetails(voucherDetails.summary);
-          }
+        const [
+          generalInfoResponse,
+          balanceInfoResponse,
+          nvtsResponse,
+          statementsResponse,
+          charitiesResponse,
+          voucherDetailsResponse,
+          standingOrdersResponse,
+          cardDetailsResponse,
+          transactionsResponse,
+          _,
+          fourDigitNumberResponse,
+        ] = responses;
     
-          const cardDetailsResponse = responses[7];
-          const fourDigitNumber = responses[10];
+        const { firstname, lastname } = generalInfoResponse.data.general[0];
+        const fullName = `${firstname} ${lastname}`;
+        const { currentbalance } = balanceInfoResponse.data.balances[0];
     
-          if (cardDetailsResponse.status !== 417 && fourDigitNumber.status !== 417) {
-            if (cardDetailsResponse.data && Array.isArray(cardDetailsResponse.data.cards)) {
-              const updatedCardDetails = cardDetailsResponse.data.cards.map(card => ({
-                ...card,
-                fourDigitNumber: fourDigitNumber.data,
-              }));
+        Animated.timing(balanceAnimatedValue, {
+          toValue: currentbalance,
+          duration: 1000,
+          useNativeDriver: false,
+        }).start();
     
-              setCardDetails(updatedCardDetails);
-            }
-          }
+        setCurrentBalance(currentbalance);
+        setFullName(fullName);
     
-          const standingOrdersResponse = responses[9].data;
-          if (standingOrdersResponse && Array.isArray(standingOrdersResponse['standing orders'])) {
-            setStandingOrders(standingOrdersResponse['standing orders']);
-          }
+        if (Array.isArray(statementsResponse.data)) {
+          setStatements(statementsResponse.data);
+        }
     
-          const charitiesResponse = responses[4].data;
-          if (charitiesResponse && Array.isArray(charitiesResponse['charity details'])) {
-            setCharities(charitiesResponse['charity details']);
-          }
+        if (generalInfoResponse.data.general && Array.isArray(generalInfoResponse.data.general)) {
+          setAccountDetails(generalInfoResponse.data.general[0]);
+        }
     
-          const transactionData = responses[8].data['transactions per client'];
-          if (Array.isArray(transactionData)) {
-            setTransactions(transactionData);
-            processTransactions(transactionData, balanceInfo.currentbalance);
-          }
+        if (voucherDetailsResponse.data && Array.isArray(voucherDetailsResponse.data.book_categories)) {
+          setVoucherDetails(voucherDetailsResponse.data.summary);
+        }
     
-          const transactionResponse = responses[8].data;
-          if (transactionResponse && Array.isArray(transactionResponse['transactions per client'])) {
-            setTransactions(transactionResponse['transactions per client']);
-          }
-    
-          setFullName(fullName);
-    
-    
-        } catch (error) {
-          console.error('Axios error:', error);
-          if (error.config) {
-            console.error(`Error config:`, error.config);
-          }
-          if (error.response) {
-            console.error(`Error response:`, error.response);
-          }
-          if (error.stack) {
-            console.error('Error stack:', error.stack);
+        if (cardDetailsResponse.status !== 417 && fourDigitNumberResponse.status !== 417) {
+          if (cardDetailsResponse.data && Array.isArray(cardDetailsResponse.data.cards)) {
+            const updatedCardDetails = cardDetailsResponse.data.cards.map((card) => ({
+              ...card,
+              fourDigitNumber: fourDigitNumberResponse.data,
+            }));
+            setPanNumber(fourDigitNumberResponse.data);
+            setCardDetails(updatedCardDetails);
           }
         }
-      } else {
-        Alert.alert('No userToken', 'userToken is not set');
+    
+        if (standingOrdersResponse.data && Array.isArray(standingOrdersResponse.data['standing orders'])) {
+          setStandingOrders(standingOrdersResponse.data['standing orders']);
+        }
+    
+        if (charitiesResponse.data && Array.isArray(charitiesResponse.data['charity details'])) {
+          const filteredCharities = charitiesResponse.data['charity details'].filter(charity => charity.regchar && charity.regchar.toLowerCase() !== 'private');
+          
+          const uniqueCharities = filteredCharities.reduce((acc, charity) => {
+            if (!acc.some(c => c.charity === charity.charity)) {
+              acc.push({
+                charity: charity.charity,
+                charityno: charity.charityno
+              });
+            }
+            return acc;
+          }, []);
+      
+          setCharities(filteredCharities);
+          setUniqueCharities(uniqueCharities); // Add this line to set the uniqueCharities in the context
+        }
+    
+        if (Array.isArray(transactionsResponse.data['transactions per client'])) {
+          const transactionData = transactionsResponse.data['transactions per client'];
+          setTransactions(transactionData);
+          const transactionsWithBalance = transactionData.map((transaction) => ({
+            ...transaction,
+            balance: currentbalance,
+          }));
+          setTransactions(transactionsWithBalance);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
       }
     };
-    
-    fetchData();
-    calculateTimeLeft();
- 
 
+    const intervalId = setInterval(() => {
+      checkAndFetchData();
+    }, 20000);
+
+    return () => clearInterval(intervalId);
   }, []);
+
   const renderBalanceCard = () => {
-    const [isExpanded, setIsExpanded] = React.useState(false);
-  
-    const toggleExpand = () => setIsExpanded(!isExpanded);
-  
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const toggleExpand = () => {
+      setIsExpanded(!isExpanded);
+
+      Animated.parallel(
+        iconAnimatedValues.map((animatedValue, index) =>
+          Animated.timing(animatedValue, {
+            toValue: isExpanded ? 1 : 0,
+            duration: 300,
+            delay: index * 100,
+            useNativeDriver: true,
+          })
+        )
+      ).start();
+    };
+
+    const balanceInterpolation = balanceAnimatedValue.interpolate({
+      inputRange: [0, currentBalance],
+      outputRange: ['0', `${currentBalance.toFixed(2)}`],
+    });
+
     return (
       <View style={styles.balanceCard}>
       <View style={styles.balanceCardView}>
+      <TouchableOpacity onPress={() => navigate("topup_Alt")} style={styles.balanceCardView}>
         <Text style={styles.balanceText}>Available Balance</Text>
-        <Text style={styles.balanceValue}>£{currentBalance.toFixed(2)}</Text>
+        <Text style={styles.balanceValue}>£{currentBalance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</Text>
+      </TouchableOpacity>
       </View>
 
       
       <View style={styles.featureColumn}>
 
         <View style={styles.subfeatureColumn}>
-          <TouchableOpacity onPress={() => navigate("send")} style={styles.featureContainer}>
+          <TouchableOpacity onPress={() => navigate("history")} style={styles.featureContainer}>
             <View style={styles.featureIconContainer}>
               <Image source={images.donate} contentFit='contain' style={styles.EvenlargerFeatureIcon} />
             </View>
@@ -450,7 +504,7 @@ const determineTimeLeftIcon = () => {
             </View>
             <Text style={styles.featureText}>Transactions</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigate("standingOrders")} style={styles.featureContainer}>
+          <TouchableOpacity onPress={() => navigate("standingOrder")} style={styles.featureContainer}>
             <View style={styles.featureIconContainer}>
               <Image 
                 source={images.calendarIconnew} 
@@ -471,16 +525,20 @@ const determineTimeLeftIcon = () => {
 
           
 {isExpanded && (
-  
-  <TouchableOpacity onPress={() =>  navigate("orderCard")} style={styles.featureContainer}>
-  <View style={styles.featureIconContainer}>
-    <Image source={images.cardDashboard} contentFit='contain' style={styles.EvenlargerFeatureIcon} />
-  </View>
-  <Text style={styles.featureText}>Order Card</Text>
-</TouchableOpacity>
-
+  <TouchableOpacity 
+    onPress={() => panNumber ? navigate("other") : navigate("orderCard")} 
+    style={styles.featureContainer}
+  >
+    <View style={styles.featureIconContainer}>
+      <Image source={images.cardDashboard} contentFit='contain' style={styles.EvenlargerFeatureIcon} />
+    </View>
+    <Text style={styles.featureText}>
+      {panNumber ? 'Card Dashboard' : 'Order Card'}
+    </Text>
+  </TouchableOpacity>
 )}
-        </View>
+
+    </View>
       </View>
       {isExpanded && (
 
@@ -524,8 +582,9 @@ const determineTimeLeftIcon = () => {
       )}
     </View>
     );
+
   };
-  // Render User Debit Card
+
   const renderAllDebitCard = () => {
     return (
       <View style={{ paddingHorizontal: 20 }}>
@@ -533,22 +592,21 @@ const determineTimeLeftIcon = () => {
           horizontal
           data={userCards}
           keyExtractor={(item, index) => index.toString()}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <Card
               number={item.number}
               balance={item.balance}
               date={item.date}
-              onPress={() => console.log("Card Pressed")}
+              onPress={() => console.log('Card Pressed')}
+              animatedValue={iconAnimatedValues[index]}
             />
-          )} />
+          )}
+        />
       </View>
-    )
-  }
-
-
-  const AccountStats = ({ accountBalance, donationsToday, totalDonations, vouchersHeld, standingOrders }) => {
-  
+    );
   };
+
+  const AccountStats = ({ accountBalance, donationsToday, totalDonations, vouchersHeld, standingOrders }) => {};
 
   const StatItem = ({ title, value, icon }) => {
     return (
@@ -568,119 +626,73 @@ const determineTimeLeftIcon = () => {
     standingOrders: 0,
   };
 
-  const statsStyles = StyleSheet.create({
-    statsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      backgroundColor: '#a98e63',
-      paddingVertical: 10,
-      borderRadius: 10,
-      marginHorizontal: 20,
-      marginTop: 20,
-    },
-    statItem: {
-      alignItems: 'center',
-    },
-    statIcon: {
-      width: 24,
-      height: 24,
-      marginBottom: 5,
-    },
-    statTitle: {
-      fontSize: 12,
-      color: '#fff',
-    },
-    statValue: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      color: '#fff',
-    },
-  });
+  let lastHeaderDate = null;
 
- // Declare lastHeaderDate outside of the map function to maintain its state across iterations
-let lastHeaderDate = null;
-
-return (
-  
-  <SafeAreaView style={styles.area}>
-    <StatusBar style="light" />
-    <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <View>
-          <Text style={styles.username}>Welcome: {fullName ? fullName : 'User'}</Text>
-        </View>
+  return (
+    <SafeAreaView style={styles.area}>
+      <StatusBar style="light" />
+      <View style={styles.container}>
         <View style={styles.headerContainer}>
-  <TouchableOpacity onPress={() => navigate("topup")} style={{ flexDirection: 'row', alignItems: 'center' }}>
-    {determineTimeLeftIcon()}
-    {
-      (() => {
-        const [minutes, seconds] = timeLeft.split(':').map(Number);
-        const totalSecondsLeft = minutes * 60 + seconds;
-        if (totalSecondsLeft <= 180) { // Less than or equal to 3 minutes
-          return <Text style={{ color: COLORS.white, marginLeft: 8 }}>{timeLeft}</Text>;
-        }
-        return null; // Don't render anything if more than 3 minutes
-      })()
-    }
-  </TouchableOpacity>
-</View>
+          <View>
+            <Text style={styles.username}>Welcome: {fullName ? fullName : 'User'}</Text>
+          </View>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={() => navigate('topup')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TimeLeftDisplay />
+              {(() => {
+                const [minutes, seconds] = timeLeft.split(':').map(Number);
+                const totalSecondsLeft = minutes * 60 + seconds;
+                if (totalSecondsLeft <= 180) {
+                  return <Text style={{ color: COLORS.white, marginLeft: 8 }}>{timeLeft}</Text>;
+                }
+                return null;
+              })()}
+            </TouchableOpacity>
+          </View>
+        </View>
+        {renderBalanceCard()}
+
+        <ScrollView style={{ top: -40 }}>
+          <AccountStats
+            donationsToday={accountStatsData.donationsToday}
+            totalDonations={accountStatsData.totalDonations}
+            vouchersHeld={accountStatsData.vouchersHeld}
+            standingOrders={accountStatsData.standingOrders}
+          />
+          <SubHeaderItem title="Recent Transactions" subtitle="View All" onPress={() => navigate('transactionsRedesign')} />
+
+          {transactions.slice(0, 22).map((transaction, index) => {
+            let displayHeader = null;
+            const displayBalance = runningBalance.toFixed(2);
+            runningBalance += 3;
+
+            const transactionDate = new Date(transaction.date).toLocaleDateString('en-GB');
+
+            if (transactionDate !== lastHeaderDate) {
+              displayHeader = transactionDate;
+              lastHeaderDate = transactionDate;
+            }
+
+            return (
+              <SavingCard
+                key={index.toString()}
+                header={displayHeader}
+                title={transaction['payment reference'] ? transaction['payment reference'] : transaction.dc_description}
+                subtitle={`Date: ${transactionDate}`}
+                icon={getTransactionIcon(transaction)}
+                percentage={60}
+                transactionAmount={transaction['credit'] > 0 ? `+£${transaction['credit'].toFixed(2)}` : `-£${transaction['debit'].toFixed(2)}`}
+                onPress={() => showTransactionModal(transaction)}
+                imageStyle={{ transform: [{ scale: 0.2 }] }}
+              />
+            );
+          })}
+          <TransactionModal isVisible={isModalVisible} transaction={selectedTransaction} onRequestClose={hideModal} />
+        </ScrollView>
       </View>
-      {renderBalanceCard()}
-
-      
-      <ScrollView style={{ top: -40 }}>
-  <AccountStats
-    donationsToday={accountStatsData.donationsToday}
-    totalDonations={accountStatsData.totalDonations}
-    vouchersHeld={accountStatsData.vouchersHeld}
-    standingOrders={accountStatsData.standingOrders}
-  />
-  <SubHeaderItem
-    title="Recent Trandsactions"
-    subtitle="View All"
-    onPress={() => navigate("transactionsRedesign")}
-  />
-
-  {transactions.slice(0, 5).map((transaction, index) => {
-     let displayHeader = null;
-    // Calculate the display balance for each transaction
-    const displayBalance = runningBalance.toFixed(2);
-    runningBalance += 3; // Modify the running balance as needed for the next transaction
-
-    const transactionDate = new Date(transaction.date).toLocaleDateString('en-GB');
-   
-
-    // Compare the current transaction date to the last header date
-    if (transactionDate !== lastHeaderDate) {
-      displayHeader = transactionDate; // Set the header to be displayed
-      lastHeaderDate = transactionDate; // Update the last header date
-    }
-
-    return (
-      <SavingCard
-        key={index.toString()}
-        header={displayHeader} // Pass the conditional header
-        title={transaction['payment reference'] ? transaction['payment reference'] : transaction.dc_description}
-        subtitle={`Date: ${transactionDate}`}
-        icon={getTransactionIcon(transaction)} // Use the function to get the appropriate icon
-        percentage={60}
-        transactionAmount={transaction['credit'] > 0 ? `+£${transaction['credit'].toFixed(2)}` : `-£${transaction['debit'].toFixed(2)}`}
-        balance={`£${displayBalance}`}
-        onPress={() => showTransactionModal(transaction)}
-        imageStyle={{ transform: [{ scale: 0.2 }] }} // Scale the image to half its size
-      />
-    );
-  })}
-  <TransactionModal
-    isVisible={isModalVisible}
-    transaction={selectedTransaction}
-    onRequestClose={hideModal}
-  />
-</ScrollView>
-    </View>
-  </SafeAreaView>
-);
-}
+    </SafeAreaView>
+  );
+};
 
 
 const modalStyles = StyleSheet.create({
@@ -744,8 +756,6 @@ const styles = StyleSheet.create({
   area: {
     flex: 1,
     backgroundColor: COLORS.primary, // Changed from COLORS.primary to '#a98e63'
-    
-
     marginBottom: 0,
     height: "100%"
   },
@@ -988,5 +998,8 @@ paddingBottom:10,
     marginTop: 10,
     alignSelf: 'center',
   },
+  timeLeftStyle:{
+    color:COLORS.white,
+  }
 })
 export default HomeScreen

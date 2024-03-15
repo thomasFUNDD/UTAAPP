@@ -85,69 +85,18 @@ const AddNewCardScreen = () => {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
             <View style={{ flex: 1, backgroundColor: COLORS.white }}>
-                <Header title="Add Card" />
-                <ScrollView style={{ marginHorizontal: 16 }}>
-                    <InputLabel title="Card Number" />
-                    <Input
-                        id="creditCardNumber"
-                        onInputChanged={inputChangedHandler}
-                        errorText={formState.inputValidities['creditCardNumber']}
-                        placeholder="0101 3920 1001 3304"
-                        placeholderTextColor={COLORS.black}
-                    />
-                    <View style={{ flexDirection: "row" }}>
-                        <View style={styles.rowLeftContainer}>
-                            <InputLabel title="Expired Date" />
-                            <Input
-                                id="creditCardExpiryDate"
-                                onInputChanged={inputChangedHandler}
-                                errorText={formState.inputValidities['creditCardExpiryDate']}
-                                placeholder=""
-                                placeholderTextColor={COLORS.black}
-                            />
-                        </View>
-                        <View style={styles.rowRightContainer}>
-                            <InputLabel title="CVC/CVV" />
-                            <Input
-                                id="cvv"
-                                onInputChanged={inputChangedHandler}
-                                errorText={formState.inputValidities['cvv']}
-                                placeholder=""
-                                placeholderTextColor={COLORS.black}
-                            />
-                        </View>
-                    </View>
-                    <InputLabel title="Cardholder Name" />
-                    <Input
-                        id="creditCardHolderName"
-                        onInputChanged={inputChangedHandler}
-                        errorText={formState.inputValidities['creditCardHolderName']}
-                        placeholderTextColor={COLORS.black}
-                        placeholder=""
-                    />
-                    <Text style={styles.subtitle}>Billing Address</Text>
-                    <InputLabel title="Address Line 1" />
-                    <Input
-                        id="addressLine1"
-                        onInputChanged={inputChangedHandler}
-                        errorText={formState.inputValidities['addressLine1']}
-                        placeholderTextColor={COLORS.black}
-                        placeholder="2890 Pangandaran Street"
-                    />
-                    <InputLabel title="Address Line 2" />
-                    <Input
-                        id="addressLine2"
-                        onInputChanged={inputChangedHandler}
-                        errorText={formState.inputValidities['addressLine2']}
-                        placeholderTextColor={COLORS.black}
-                        placeholder=""
-                    />
+                <Header title="Block Card" />
+                <ScrollView style={{ marginHorizontal: 16, marginTop: 200 }}>
+                    <Text style={{ marginVertical: 20, fontSize: 16, textAlign: 'center', color: COLORS.black }}>
+                        Pressing this button will put a temporary block on your card. You can unblock it anytime from your dashboard.
+                    </Text>
                     <Button
-                        title="Save Card"
+                        title="Block Card"
                         filled
-                        onPress={() => navigate('yourcard')}
+                        onPress={() => {/* Block card logic here */}}
                         style={{
-                            marginVertical: 12
+                            marginVertical: 12,
+                            alignSelf: 'center'
                         }}
                     />
                 </ScrollView>

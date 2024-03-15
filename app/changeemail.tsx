@@ -1,5 +1,5 @@
 import {KeyboardAvoidingView, Platform, ScrollView, View, Text, StyleSheet, Alert, TextInput  } from 'react-native'
-import React, { useCallback, useEffect, useReducer, useState } from 'react'
+import React, { useCallback, useEffect, useReducer, useState, useContext } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { COLORS, SIZES } from '../constants'
 import Header from '../components/Header'
@@ -12,9 +12,8 @@ import Button from '../components/Button'
 import BalanceProvider from '../../data/BalanceProvider'; // Adjust the path as necessary
 import BalanceContext from '../../data/balancesContext';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import otherContext from '../../data/otherContext';
+import otherContext from '../data/otherContext';
 import otherContextProvider from '../../data/otherContextProvider';
-import OtherContext from '../../data/otherContext';
 import { Picker } from '@react-native-picker/picker'; // Import Picker
 
 type Nav = {
@@ -56,10 +55,19 @@ const initialState: FormState = {
 const ChangeEmailScreen = () => {
     const { navigate } = useNavigation<Nav>()
     const [error, setError] = useState<string | undefined>()
-    const [formState, dispatchFormState] = useReducer(reducer, initialState)
+
     const [selectedSupportType, setSelectedSupportType] = useState('generalEnquiry'); // State to hold the selected option
+    const {  accountDetails } = useContext(otherContext);
 
+    const [formState, dispatchFormState] = useReducer(reducer, {
+        ...initialState,
+        inputValues: {
+            ...initialState.inputValues,
+            currentEmail: accountDetails.em_address ? accountDetails.em_address : '',
+        },
+    });
 
+    console.log(accountDetails.em_address);
     const inputChangedHandler = useCallback(
         (inputId: string, inputValue: string) => {
             const result = validateInput(inputId, inputValue)
@@ -77,6 +85,39 @@ const ChangeEmailScreen = () => {
             Alert.alert('An error occurred', error)
         }
     }, [error])
+
+    // Function to post data to PHP
+    const postDataToPHP = async () => {
+        const formData = new FormData();
+        formData.append('name', formState.inputValues.name); // Assuming you have a name field
+        formData.append('email', formState.inputValues.currentEmail);
+        formData.append('message', formState.inputValues.message); // Assuming you have a message field
+        formData.append('vaccountno', accountDetails.vaccountno); // Example account number, adjust as needed
+        formData.append('department', accountDetails.em_address); // Example department email, adjust as needed
+    //dd
+    formData.append('enquiryType', selectedSupportType); // Append the selectedSupportType to the formData
+
+        try {
+            const response = await fetch('https://app.utauk.org/postMailContactMobile.php', {
+                method: 'POST',
+                body: formData,
+            });
+    
+            if (!response.ok) {
+                throw new Error('Failed to post data');
+            }
+    
+            const responseData = await response.text(); // Adjusted to expect text/html response
+            console.log(responseData);
+            Alert.alert('Success', 'Email sent successfully');
+            navigate("profile");
+        } catch (error) {
+            console.error("Error sending email:", response);
+            console.error("Error sending email:", error);
+            setError('Failed to send email');
+        }
+    };
+
     return (
         <SafeAreaView style={styles.area}>
             <KeyboardAvoidingView
@@ -98,6 +139,7 @@ const ChangeEmailScreen = () => {
                         >
                             <Picker.Item label="General Enquiry" value="generalEnquiry" />
                             <Picker.Item label="Technical Support" value="technicalSupport" />
+                            <Picker.Item label="Missing Charity" value="missingCharity" />
                         </Picker>
                         <InputLabel title="Your Name" />
                         <Input
@@ -109,14 +151,15 @@ const ChangeEmailScreen = () => {
                         />
                         <InputLabel title="Your Email" />
                         <Input
-                            id="currentEmail"
-                            onInputChanged={inputChangedHandler}
-                            errorText={formState.inputValidities['currentEmail']}
-                            placeholder="example@mail.com"
-                            placeholderTextColor={COLORS.black}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
+    id="currentEmail"
+    onInputChanged={inputChangedHandler}
+    errorText={formState.inputValidities['currentEmail']}
+    placeholder="example@mail.com"
+    placeholderTextColor={COLORS.black}
+    keyboardType="email-address"
+    autoCapitalize="none"
+    value={formState.inputValues.currentEmail} // Set the input's value to currentEmail from formState
+/>
                         <InputLabel title="Your Message" />
                         <TextInput
                             id="message"
@@ -133,7 +176,7 @@ const ChangeEmailScreen = () => {
                 <View style={styles.buttonContainer}>
                 <Button
                     title="Save Email"
-                    onPress={() => navigate("profile")}
+                    onPress={postDataToPHP} // Use postDataToPHP here
                     filled
                     style={styles.button}
                 />

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Banka",
-    "slug": "Banka",
+    "name": "UTAUK",
+    "slug": "UTAUK",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -22,7 +22,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.luckytommy.Banka"
     },
     "web": {
       "bundler": "metro",
@@ -30,10 +31,20 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store",
+      "@sentry/react-native/expo"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "8b321e7e-7b22-4722-ba9d-885c838de039"
+      }
     }
   }
 }

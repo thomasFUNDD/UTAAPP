@@ -1,6 +1,6 @@
-import { View, Text, TouchableOpacity,SafeAreaView,ScrollView, StyleSheet, Modal, TouchableWithoutFeedback, SectionList, FlatList, } from 'react-native'
-import React, { useState, useEffect, useContext, useRef } from 'react';
-
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, StyleSheet, Modal, TouchableWithoutFeedback, FlatList, } from 'react-native'
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
+import { throttle } from 'lodash';
 import { TextInput } from 'react-native';
 import { Image } from 'expo-image'
 import { COLORS, SIZES, icons, images } from '../constants'
@@ -24,6 +24,25 @@ interface ContainerProps {
 type Nav = {
     navigate: (value: string) => void
 }
+
+
+
+// Define icons outside the component
+const Icons = {
+  Voucher: <Ionicons name="pricetag" size={24} color="#a98e63" />,
+  Blank: <Image source={images.transferMoney} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />,
+  CardSystem: <Ionicons name="card" size={24} color="#a98e63" />,
+  Q: <Ionicons name="card" size={24} color="#a98e63" />,
+  NV: <Ionicons name="swap-vertical" size={24} color="#a98e63" />,
+  TaxRefund: <Ionicons name="swap-vertical" size={24} color="#a98e63" />,
+  NonVoucherTransfer: <Image source={images.transferMoney} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />,
+  NVTS: <Image source={images.taxGold} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />,
+  Default: <Image source={images.transferMoneyGold} style={{ width: 24, height: 24 }} resizeMode="contain" />,
+  CO: <Ionicons name="cash-outline" size={24} color="#a98e63" />,
+  VO: <Ionicons name="pricetag" size={24} color="#a98e63" />,
+  Gi: <Ionicons name="gift" size={24} color="#a98e63" />,
+  Ta: <Image source={images.taxGold} style={{ width: 24, height: 24 }} resizeMode="contain" />,
+};
 
 const data = [1, 2, 5, 20,25, 50, 100, 500, 1000, 2500];
 
@@ -50,7 +69,7 @@ const SendScreen = () => {
     const [selectedCharity, setSelectedCharity] = useState(null);
     const [selectedBankAccount, setSelectedBankAccount] = useState(null);
     const { transactions } = useContext(OtherContext); // Access transactions from context
-    const [activeFilter, setActiveFilter] = useState('all'); // 'in', 'out', or 'receipt'
+    const [activeFilter, setActiveFilter] = useState('all'); // Default to showing all transactions
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     let runningBalance = currentBalance; // Start with the initial balance
     const [filteredTransactions, setFilteredTransactions] = useState(transactions);
@@ -60,9 +79,30 @@ const SendScreen = () => {
     const [stickyHeader, setStickyHeader] = useState('');
     const flatListRef = useRef(null);
     const { statements } = useContext(OtherContext); // Access statements from context
-
+    const [sections, setSections] = useState([]); // Initialize sections state
+    const [isLoading, setIsLoading] = useState(false);
+    const [hasMoreTransactions, setHasMoreTransactions] = useState(true); // Assume more transactions are available initially
+    const [processedTransactions, setProcessedTransactions] = useState([]); // Holds all loaded transactions
     const [searchTerm, setSearchTerm] = useState('');
 
+    const throttledOnScroll = throttle((event) => {
+      // This function will be called at most once every 100 milliseconds
+      // You can implement any logic here that needs to respond to scroll events
+      // For example, logging the scroll position:
+      // console.log(event.nativeEvent.contentOffset.y);
+    }, 10);
+
+      const transformedData = sections.reduce((acc, section) => {
+    // Add section header
+    acc.push({ type: 'header', title: section.title, id: `header-${section.title}` });
+
+    // Add items for the section
+    section.data.forEach((item, index) => {
+      acc.push({ type: 'item', ...item, id: item.id || `item-${section.title}-${index}` });
+    });
+
+    return acc;
+  }, []);
 
     const formatTransactionDetail = (key, value) => {
       let formattedKey = key.replace(/_/g, ' '); // Replace underscores with spaces
@@ -102,10 +142,10 @@ const SendScreen = () => {
       let filtered;
       switch (filterType) {
           case 'in':
-              filtered = transactions.filter(t => t.debit > 0);
+              filtered = transactions.filter(t => t.credit > 0);
               break;
           case 'out':
-              filtered = transactions.filter(t => t.credit > 0);
+              filtered = transactions.filter(t => t.debit > 0);
               break;
           case 'all':
               filtered = transactions;
@@ -115,18 +155,18 @@ const SendScreen = () => {
               filtered = transactions;
               break;
       }
-      setFilteredTransactions(filtered);
+      const groupedByDate = groupTransactionByDate(filtered);
+      setSections(groupedByDate); // Update sections state with grouped transactions
   };
 
 
-  const TransactionDetailsModal = ({ isVisible, onClose, transaction }) => {
-    if (!transaction) return null;
-  
-    // Example of formatting a date string, adjust according to your date format
-    const formatDate = (dateString) => {
+  const TransactionDetailsModal = React.memo(({ isVisible, onClose, transaction }) => {
+    const formatDate = useCallback((dateString) => {
       const options = { year: 'numeric', month: 'long', day: 'numeric' };
       return new Date(dateString).toLocaleDateString(undefined, options);
-    };
+    }, []); // No dependencies, so this callback never changes
+
+    if (!transaction) return null;
   
     return (
       <Modal
@@ -155,20 +195,21 @@ const SendScreen = () => {
         </View>
       </Modal>
     );
-  };
+  });
     
+  const handleSearch = useCallback((text) => {
+    setSearchTerm(text);
+    if (text === '') {
+        setFilteredTransactions(transactions); // Show all transactions if search is cleared
+    } else {
+        const filtered = transactions.filter(transaction =>
+            transaction['payment reference'] && transaction['payment reference'].toLowerCase().includes(text.toLowerCase())
+        );
+        setFilteredTransactions(filtered); // Update the state with the filtered transactions
+    }
+}, [transactions]);
 
-    const handleSearch = (text) => {
-        setSearchTerm(text);
-        if (text === '') {
-          setFilteredTransactions(transactions); // Show all transactions if search is cleared
-        } else {
-          const filtered = transactions.filter(transaction =>
-            transaction['payment reference'].toLowerCase().includes(text.toLowerCase())
-          );
-          setFilteredTransactions(filtered); // Update the state with the filtered transactions
-        }
-      };
+
 
 
       const handleScroll = (event) => {
@@ -176,7 +217,7 @@ const SendScreen = () => {
         // This is a simplified example; you'll need to calculate based on your data and item height
         const currentOffset = event.nativeEvent.contentOffset.y;
         const currentItemIndex = Math.floor(currentOffset / ITEM_HEIGHT); // Replace ITEM_HEIGHT with your item height
-        const currentHeader = transactions[currentItemIndex].date;
+        const currentHeader = processedTransactions[currentItemIndex].date;
         setStickyHeader(currentHeader);
       };
 
@@ -185,57 +226,49 @@ const SendScreen = () => {
           <Text style={styles.stickyHeaderText}>{stickyHeader}</Text>
         </View>
       );
-      const renderTransaction = ({ item, index }) => {
-
-
-        // Log the transaction details
-       
-        console.log(`Rendering transaction at index ${item}. Selected: ${selectedTransaction === index}`);
+      const RenderTransaction = React.memo(({ item, index }) => {
         const onPressHandler = () => {
           setSelectedTransactionDetails(item); // Set the selected transaction details
           setIsModalVisible(true); // Show the modal
         };
+      
         return (
           <TouchableOpacity
-          key={index}
-          style={styles.transactionContainer}
-          onPress={onPressHandler}
-        >
+            key={index}
+            style={styles.transactionContainer}
+            onPress={onPressHandler}
+          >
             <View style={styles.transactionHeader}>
               <View style={styles.transactionDescription}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={styles.transactionReferenceContainer}>
-                  {getCategoryIcon(item.txncategory, item.tt_id)}
+                    {getCategoryIcon(item.txncategory, item.tt_id)}
                   </View>
                   <Text style={styles.transactionReferenceText}>
                     {item['payment reference'] ? item['payment reference'] : item.dc_description}
                   </Text>
                 </View>
-            
               </View>
               <View style={styles.balanceContainer}>
-                <Text>
-                  {item.debit > 0 ? (
-                    <Text style={{ color: '#a98e63', fontSize: 24 }}>+</Text>
-                  ) : (
-                    <Text style={{ color: '#a98e63', fontSize: 24 }}>-</Text>
-                  )}
-                  <Text style={{ color: 'black' }}>
-                    £{item.debit > 0 ? item.debit.toFixed(2) : item.credit.toFixed(2)}
-                  </Text>
+                <Text style={{ color: '#a98e63', fontSize:24 }}>
+                  {item.debit > 0 ? "-" : "+"}
+                </Text>
+                <Text style={{ color: 'black' }}>
+                  £{item.debit > 0 ? item.debit.toFixed(2) : item.credit.toFixed(2)}
                 </Text>
               </View>
             </View>
           </TouchableOpacity>
-      );
-    };
+        );
+      });
     const getFilteredTransactions = () => {
+     
         switch (activeFilter) {
-            case 'in':
+            case 'Out':
                 return transactions.filter(t => t.debit > 0);
-            case 'out':
+            case 'In':
                 return transactions.filter(t => t.credit > 0);
-                case 'all':
+                case 'All':
             return transactions; // return all transactions when filter is 'all'
             case 'receipt':
                 // Implement receipt creation logic
@@ -249,57 +282,56 @@ const SendScreen = () => {
     const handleNavigateToCreateReceipt = () => {
       navigation.navigate('CreateReceipt');
   };
-         
-    const groupTransactionsByDate = (transactions) => {
-      return transactions.reduce((acc, transaction) => {
-          const date = transaction.date;
-          if (!acc[date]) {
-              acc[date] = [];
-          }
-          acc[date].push(transaction);
-          return acc;
-      }, {});
+
+
+  const groupTransactionByDate = (transactions) => {
+    const grouped = transactions.reduce((acc, transaction) => {
+      const date = transaction.date; // Assuming 'date' is a property of your transactions
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(transaction);
+      return acc;
+    }, {});
+
+    // Convert to array format expected by SectionList
+    return Object.keys(grouped).map(date => ({
+      title: date,
+      data: grouped[date],
+    }));
   };
-  const groupedTransactions = groupTransactionsByDate(getFilteredTransactions());
+         
+  useEffect(() => {
 
 
-  const renderSectionHeader = ({ section: { title } }) => {
-    // Parse the title as a date
-    const sectionDate = new Date(title);
-    const now = new Date();
-    
-    // Helper function to format the date as "Month day, year"
-    const formatDate = (date) => {
-      const options = { year: 'numeric', month: 'long', day: 'numeric' };
-      return date.toLocaleDateString('en-US', options);
+
+    // Function to group transactions by date
+    const groupTransactionsByDate = (transactions) => {
+      const grouped = transactions.reduce((acc, transaction) => {
+        const date = transaction.date; // Assuming 'date' is a property of your transactions
+        if (!acc[date]) {
+          acc[date] = [];
+        }
+        acc[date].push(transaction);
+        return acc;
+      }, {});
+  
+      // Convert to array format expected by SectionList
+      return Object.keys(grouped).map(date => ({
+        title: date,
+        data: grouped[date],
+      }));
     };
   
-    // Check if the section date is today or yesterday
-    const isToday = sectionDate.toDateString() === now.toDateString();
-    const isYesterday = sectionDate.toDateString() === new Date(now.setDate(now.getDate() - 1)).toDateString();
-  
-    // Determine the header text
-    let headerText;
-    if (isToday) {
-      headerText = 'Today';
-    } else if (isYesterday) {
-      headerText = 'Yesterday';
-    } else {
-      headerText = formatDate(sectionDate);
-    }
-  
-    return (
-      <View style={styles.stickySectionHeader}>
-        <Text style={styles.sectionHeaderText}>{headerText}</Text>
-      </View>
-    );
-  };
+    console.log("filteredTransactions state updated:", filteredTransactions);
+    const updatedSections = groupTransactionsByDate(filteredTransactions);
+    console.log("Grouped transactions:", updatedSections);
+    setSections(updatedSections);
+  }, [filteredTransactions]);
 
-    const sections = Object.keys(groupedTransactions).map(date => ({
-    title: date,
-    data: groupedTransactions[date],
-  }));
-    const renderHeader = () => {
+
+  const renderHeader = () => {
+    
         return (
             <View style={styles.headerContainer}>
                 <TouchableOpacity
@@ -324,59 +356,13 @@ const SendScreen = () => {
     }
 
     const getCategoryIcon = (category, tt_id) => {
-      
-      // Check if category is not null and not empty
-      const svgXml = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 512 512"><rect width="448" height="256" x="32" y="80" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="32" rx="16" ry="16" transform="rotate(180 256 208)"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M64 384h384M96 432h320"/><circle cx="256" cy="208" r="80" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M480 160a80 80 0 0 1-80-80M32 160a80 80 0 0 0 80-80m368 176a80 80 0 0 0-80 80M32 256a80 80 0 0 1 80 80"/></svg>`;
-
       if (category) {
-        switch (category) {
-          case 'Voucher':
-            return <Ionicons name="pricetag" size={24} color="#a98e63" />;
-          case 'Blank':
-            return <Image source={images.transferMoney} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />;
-            case 'Card System':
-            return <Ionicons name="card" size={24} color="#a98e63" />;
-
-            case 'Q':
-              return <Ionicons name="card" size={24} color="#a98e63" />;
-          case 'NV':
-            return <Ionicons name="swap-vertical" size={24} color="#a98e63" />;
-          case 'Tax Refund':
-            return <Ionicons name="swap-vertical" size={24} color="#a98e63" />;
-
-            case 'Non Voucher Transfer':
-              return <Image source={images.transferMoney} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />;
-          
-                case 'NVTS':
-                  return <Image source={images.taxGold} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />;
-
-                  case 'NV':
-                    return <Image source={images.transferMoney} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />;
-          default:
-            return <Image source={images.transferMoneyGold} style={{ width: 24, height: 24 }} resizeMode="contain" />;
-        }
+        return Icons[category] || Icons.Default;
       } else {
-        // Category is null or empty, check tt_id
-        switch (tt_id) {
-          case 'CO':
-            return <Ionicons name="cash-outline" size={24} color="#a98e63" />;
-          case 'VO':
-            return <Ionicons name="pricetag" size={24} color="#a98e63" />;
-          case 'NV':
-            return <Image source={images.transferMoney} style={{ width: 24, height: 24, tintColor: COLORS.primary }} resizeMode="contain" />;
-            
-            case 'NVTS':
-              return <Image source={images.transferMoney} style={{ width: 24, height: 24 }} resizeMode="contain" />;
-          case 'Gi':
-            return <Ionicons name="gift" size={24} color="#a98e63" />;
-          case 'Ta':
-            // Use the Image component for displaying image assets
-            return <Image source={images.taxGold} style={{ width: 24, height: 24 }} resizeMode="contain" />;
-          default:
-            return <Ionicons name="card" size={24} color="#a98e63" />;
-        }
+        return Icons[tt_id] || Icons.Default;
       }
     };
+
       const formatNumber = (num) => {
         let [base, exponent] = num.toExponential(2).split('e');
         let [lead, decimal] = base.split('.');
@@ -445,13 +431,31 @@ const SendScreen = () => {
         onChangeText={handleSearch}
       />
     </View>
-        <SectionList
-          sections={sections}
-          keyExtractor={(item, index) => String(index)}
-          renderItem={renderTransaction}
-          renderSectionHeader={renderSectionHeader}
-          stickySectionHeadersEnabled={true}
+    <FlatList
+  data={transformedData}
+  keyExtractor={(item, index) => item.id.toString()}
+  renderItem={({ item, index }) => {
+    if (item.type === 'header') {
+      return (
+        <View style={styles.stickySectionHeader}>
+          <Text style={styles.sectionHeaderText}>
+            {item.title.split('-').reverse().join('-')}
+          </Text>
+        </View>
+      );
+    } else {
+      return (
+        <RenderTransaction
+          item={item}
+          index={index}
         />
+      );
+    }
+  }}
+  initialNumToRender={50}
+  onEndReachedThreshold={1}
+  onScroll={throttledOnScroll}
+/>
     </View>
     </SafeAreaView>
   );
@@ -664,6 +668,8 @@ const styles = StyleSheet.create({
     balanceContainer: {
         width: '18%', // Adjust as needed
         alignItems: 'flex-start', // Align text to the right
+         flexDirection: 'row', // Align children in a row
+    alignItems: 'center'
     },
     headerContainer: {
         flexDirection: "row",
@@ -672,7 +678,7 @@ const styles = StyleSheet.create({
         paddingTop: 40,
         marginBottom: 16,
         backgroundColor: COLORS.primary,
-        height: 78
+        height: 78,
     },
     transactionItem: {
         backgroundColor: '#fff',
@@ -764,11 +770,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, // Add a bottom border for visual separation
     borderBottomColor: '#E0E0E0', // Use a light color for the border
     zIndex: 1, // Ensure the header is above the list items
+    justifyContent: 'center', // Centers content vertically within the container
+    alignItems: 'center', // Centers content horizontally within the container
   },
   sectionHeaderText: {
     fontWeight: 'bold',
-    fontSize: 16,
-    color: 'white'
+    fontSize: 20,
+    color: 'white',
+    textAlign: 'center', // Ensures text is centered within the text component itself
+  },
+  headerText: {
+    // ... other header text styles, like font size, font weight, etc.
+    color: 'white', // This sets the text color to white
+    textAlign: 'center', // Center the text
   },
   filterRow: {
     flexDirection: 'row',

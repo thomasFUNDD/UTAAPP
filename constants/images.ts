@@ -70,17 +70,21 @@ const voucherIconProfile = require("../assets/images/voucherIcon.png") as string
 const money = require("../assets/images/money.png") as string;
 const moneyBlack = require("../assets/images/moneyBlack.png") as string;
 
+const gift = require("../assets/images/gift.png") as string;
 
 
+const cardTransaction = require("../assets/images/masterCard.png") as string;
 const transferMoneyGold = require("../assets/images/transferMoneyGold.png") as string;
 const transferMoney = require("../assets/images/transferMoney.png") as string;
 const images = {
     avatar1,
+    cardTransaction,
     taxRefund,
     taxGold,
     avatar2,
     money,
     moneyBlack,
+    gift,
     avatar3,
     avatar4,
     transferMoney,
