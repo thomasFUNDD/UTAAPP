@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "UTAUK",
-    "slug": "UTAUK",
+    "slug": "utauk",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -23,27 +23,39 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.luckytommy.Banka"
+      "package": "com.luckytommy.Banka",
+      "enableProguardInReleaseBuilds": true,
+      "proguardMappingFile": "proguard-mapping.txt"
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "@sentry/react-native/expo"
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "org": "next-gen-philanthropy",
+          "project": "react-native"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
+      "apiUrl": "https://api.utauk.org:4443/api",
+      "token": "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",
+      "sentryDsn": "https://18de0fb4a36e721c583de945a2e16bc3@o4506915884630016.ingest.us.sentry.io/4506915885678592",
+      "sentryEnabled": true,
       "router": {
         "origin": false
       },
       "eas": {
-        "projectId": "8b321e7e-7b22-4722-ba9d-885c838de039"
+        "projectId": "bf126f36-1eaa-4bd5-84cb-65282962b995"
       }
     }
   }

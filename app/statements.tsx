@@ -1,56 +1,45 @@
-import { View, Text, TouchableOpacity,SafeAreaView,ScrollView, StyleSheet, Modal, TouchableWithoutFeedback } from 'react-native'
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, StyleSheet, Modal, TouchableWithoutFeedback } from 'react-native';
 import React, { useState, useEffect, useContext } from 'react';
-
 import { TextInput } from 'react-native';
-import { Image } from 'expo-image'
-import { COLORS, SIZES, icons, images } from '../constants'
-import Slider from '@react-native-community/slider'; // Ensure this is the only Slider import
-import { useNavigation } from 'expo-router'
-import Button from '../components/Button'
-import { Feather } from '@expo/vector-icons'
+import { Image } from 'expo-image';
+import { COLORS, SIZES, icons, images } from '../constants';
+import Slider from '@react-native-community/slider';
+import { useNavigation } from 'expo-router';
+import Button from '../components/Button';
+import { Feather } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import BalanceContext from '../data/balancesContext'; // Adjust the path as necessary
-import OtherContext from '../data/otherContext'; // Adjust the import path as necessary
+import BalanceContext from '../data/balancesContext';
+import OtherContext from '../data/otherContext';
 import { Ionicons } from 'react-native-vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { API_URL, TOKEN } from '@env' // Import environment variables
-
+import { API_URL, TOKEN } from '@env';
 import RNFetchBlob from 'rn-fetch-blob';
 import { PermissionsAndroid, Platform } from 'react-native';
 import * as Permissions from 'expo-permissions';
 import * as MediaLibrary from 'expo-media-library';
 import * as Linking from 'expo-linking';
 import * as Sharing from 'expo-sharing';
-import { encode as btoa } from 'base-64'; 
+import { encode as btoa } from 'base-64';
 import * as FileSystem from 'expo-file-system';
 
 interface ContainerProps {
-    item: string | number;
-    isSelected: boolean;
-    onSelect: () => void;
+  item: string | number;
+  isSelected: boolean;
+  onSelect: () => void;
 }
 
 type Nav = {
-    navigate: (value: string) => void
-}
+  navigate: (value: string) => void;
+};
 
-const data = [1, 2, 5, 20,25, 50, 100, 500, 1000, 2500];
-
+const data = [1, 2, 5, 20, 25, 50, 100, 500, 1000, 2500];
 
 const Container: React.FC<ContainerProps> = ({ item, isSelected, onSelect }) => (
-    <TouchableOpacity
-        style={[styles.amountContainer, isSelected && styles.selectedContainer]}
-        onPress={onSelect}
-    >
-        <Text style={{
-            fontSize: 14,
-            fontFamily: 'medium',
-            color: isSelected ? COLORS.white : "gray"
-        }}>£{item}</Text>
-    </TouchableOpacity>
+  <TouchableOpacity style={[styles.amountContainer, isSelected && styles.selectedContainer]} onPress={onSelect}>
+    <Text style={{ fontSize: 14, fontFamily: 'medium', color: isSelected ? COLORS.white : 'gray' }}>£{item}</Text>
+  </TouchableOpacity>
 );
-
 
 const openAppSettings = () => {
   if (Platform.OS === 'android') {
@@ -64,19 +53,15 @@ const downloadFile = async (url, fileName) => {
   return downloadResult.uri;
 };
 
-
 const requestStoragePermission = async () => {
   try {
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-      {
-        title: 'Storage Permission',
-        message: 'This app needs access to your storage to download files.',
-        buttonNeutral: 'Ask Me Later',
-        buttonNegative: 'Cancel',
-        buttonPositive: 'OK',
-      },
-    );
+    const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE, {
+      title: 'Storage Permission',
+      message: 'This app needs access to your storage to download files.',
+      buttonNeutral: 'Ask Me Later',
+      buttonNegative: 'Cancel',
+      buttonPositive: 'OK',
+    });
     if (granted === PermissionsAndroid.RESULTS.GRANTED) {
       console.log('You can use the storage');
     } else {
@@ -87,170 +72,177 @@ const requestStoragePermission = async () => {
   }
 };
 
-
 const SendScreen = () => {
-    const navigation = useNavigation<Nav>();
-    const [modalVisible, setModalVisible] = useState(false);
-    const { currentBalance } = useContext(BalanceContext);
-    const { charities } = useContext(OtherContext);
-    const [selectedCharity, setSelectedCharity] = useState(null);
-    const [selectedBankAccount, setSelectedBankAccount] = useState(null);
-    const { transactions } = useContext(OtherContext); // Access transactions from context
-    const [activeFilter, setActiveFilter] = useState('all'); // 'in', 'out', or 'receipt'
-    const [selectedTransaction, setSelectedTransaction] = useState(null);
-    let runningBalance = currentBalance; // Start with the initial balance
-    const [filteredTransactions, setFilteredTransactions] = useState(transactions);
-    const { statements } = useContext(OtherContext); // Access statements from context
-    const [filteredStatements, setFilteredStatements] = useState(statements);
+  const navigation = useNavigation<Nav>();
+  const [modalVisible, setModalVisible] = useState(false);
+  const { currentBalance } = useContext(BalanceContext);
+  const { charities } = useContext(OtherContext);
+  const [selectedCharity, setSelectedCharity] = useState(null);
+  const [selectedBankAccount, setSelectedBankAccount] = useState(null);
+  const { transactions } = useContext(OtherContext);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  let runningBalance = currentBalance;
+  const [filteredTransactions, setFilteredTransactions] = useState(transactions);
+  const { statements } = useContext(OtherContext);
+  const [filteredStatements, setFilteredStatements] = useState(statements);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatement, setSelectedStatement] = useState(null);
 
-
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const [selectedStatement, setSelectedStatement] = useState(null); // Define the state for the selected statement
-    function arrayBufferToBase64(buffer) {
-      let binary = '';
-      const bytes = new Uint8Array(buffer);
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return btoa(binary);
+  function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
-    
-    async function fetchStatementPage(pageNumber) {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        const apiUrl = `${API_URL}/client/statements/${pageNumber}`;
-        const fileUri = `${FileSystem.cacheDirectory}statement_${pageNumber}.pdf`;
-    
-        const response = await axios.get(apiUrl, {
-          responseType: 'arraybuffer',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-    
-        const base64 = arrayBufferToBase64(response.data);
-    
-        await FileSystem.writeAsStringAsync(fileUri, base64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-    
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(fileUri);
-        } else {
-          console.log('Sharing is not available');
-        }
-      } catch (error) {
-        console.error('Error fetching and sharing PDF:', error);
-      }
-    }
+    return btoa(binary);
+  }
 
-    const handleSelectStatement = (index) => {
-      if (selectedStatement === index) {
-        setSelectedStatement(null); // Deselect if the same card is clicked again
+  async function fetchStatementPage(pageNumber) {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const apiUrl = `${API_URL}/client/statements/${pageNumber}`;
+      const fileUri = `${FileSystem.cacheDirectory}statement_${pageNumber}.pdf`;
+
+      const response = await axios.get(apiUrl, {
+        responseType: 'arraybuffer',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const base64 = arrayBufferToBase64(response.data);
+
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
       } else {
-        setSelectedStatement(index);
+        console.log('Sharing is not available');
       }
-    };
-
-        const handleFilter = (filterType) => {
-        setActiveFilter(filterType);
-    };
-
-
-    const handleSearch = (text) => {
-        setSearchTerm(text);
-        if (text === '') {
-          setFilteredTransactions(transactions); // Show all transactions if search is cleared
-        } else {
-          const filtered = transactions.filter(transaction =>
-            transaction['payment reference'].toLowerCase().includes(text.toLowerCase())
-          );
-          setFilteredTransactions(filtered); // Update the state with the filtered transactions
-        }
-      };
-    const getFilteredTransactions = () => {
-        switch (activeFilter) {
-            case 'in':
-                return transactions.filter(t => t.debit > 0);
-            case 'out':
-                return transactions.filter(t => t.credit > 0);
-            case 'receipt':
-                // Implement receipt creation logic
-                break;
-            default:
-                return transactions;
-        }
-    };
-
-         
-    const renderHeader = () => {
-        return (
-            <View style={styles.headerContainer}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                >
-                    <Image
-                        source={icons.back}
-                        contentFit='contain'
-                        style={styles.backIcon}
-                    />
-                </TouchableOpacity>
-                <Text style={styles.title}>Statements</Text>
-                <TouchableOpacity>
-                    <Image
-                        source={icons.more}
-                        contentFit='contain'
-                        style={styles.moreIcon}
-                    />
-                </TouchableOpacity>
-            </View>
-        )
+    } catch (error) {
+      console.error('Error fetching and sharing PDF:', error);
+      if (error.response && error.response.status === 500) {
+        setErrorModalVisible(true);
+      }
     }
+  }
 
+  const handleSelectStatement = (index) => {
+    if (selectedStatement === index) {
+      setSelectedStatement(null);
+    } else {
+      setSelectedStatement(index);
+    }
+  };
 
+  const handleFilter = (filterType) => {
+    setActiveFilter(filterType);
+  };
 
+  const handleSearch = (text) => {
+    setSearchTerm(text);
+    if (text === '') {
+      setFilteredTransactions(transactions);
+    } else {
+      const filtered = transactions.filter((transaction) =>
+        transaction['payment reference'].toLowerCase().includes(text.toLowerCase())
+      );
+      setFilteredTransactions(filtered);
+    }
+  };
 
+  const getFilteredTransactions = () => {
+    switch (activeFilter) {
+      case 'in':
+        return transactions.filter((t) => t.debit > 0);
+      case 'out':
+        return transactions.filter((t) => t.credit > 0);
+      case 'receipt':
+        break;
+      default:
+        return transactions;
+    }
+  };
 
- return (
-  <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.primary }}>
-    <View style={styles.filterContainer}>
-      {renderHeader()}
-    </View>
-    <View style={{ flex: 1, backgroundColor: COLORS.white }}>
-      <View style={styles.searchBarContainer}>
-        <Feather name="search" size={20} color={COLORS.darkGray} />
-        <TextInput
-          style={styles.searchBarInput}
-          placeholder="Search statements"
-          placeholderTextColor={COLORS.darkGray}
-          value={searchTerm}
-          onChangeText={handleSearch}
-        />
+  const renderHeader = () => {
+    return (
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Image source={icons.back} contentFit="contain" style={styles.backIcon} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Statements</Text>
+        <TouchableOpacity>
+          <Image source={icons.more} contentFit="contain" style={styles.moreIcon} />
+        </TouchableOpacity>
       </View>
-      <ScrollView>
-        {statements.map((statement, index) => (
-          <View key={index} style={styles.statementContainer}>
-            <View style={styles.statementRow}>
-              <Ionicons name="document" size={24} color="black" />
-              <View style={styles.statementContent}>
-                <Text style={styles.transactionReference}>Statement Page: {statement.stmt_pageno}</Text>
-                <Text style={styles.transactionReference}>Statement From: {statement.stmt_from_date}</Text>
-                <Text style={styles.transactionReference}>Statement To: {statement.stmt_to_date}</Text>
+    );
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.primary }}>
+      <View style={styles.filterContainer}>{renderHeader()}</View>
+      <View style={{ flex: 1, backgroundColor: COLORS.white }}>
+        <View style={styles.searchBarContainer}>
+          <Feather name="search" size={20} color={COLORS.darkGray} />
+          <TextInput
+            style={styles.searchBarInput}
+            placeholder="Search statements"
+            placeholderTextColor={COLORS.darkGray}
+            value={searchTerm}
+            onChangeText={handleSearch}
+          />
+        </View>
+        <ScrollView>
+          {statements.map((statement, index) => (
+            <View key={index} style={styles.statementContainer}>
+              <View style={styles.statementRow}>
+                <Ionicons name="document" size={24} color="black" />
+                <View style={styles.statementContent}>
+                  <Text style={styles.transactionReference}>Statement Page: {statement.stmt_pageno}</Text>
+                  <Text style={styles.transactionReference}>Statement From: {statement.stmt_from_date}</Text>
+                  <Text style={styles.transactionReference}>Statement To: {statement.stmt_to_date}</Text>
+                </View>
               </View>
+              <TouchableOpacity
+                style={styles.openStatementButton}
+                onPress={() => fetchStatementPage(statement.stmt_pageno)}
+              >
+                <Text style={styles.openStatementText}>Open Statement</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.openStatementButton}
-                  onPress={() => fetchStatementPage(statement.stmt_pageno)}
-                  >
-              <Text style={styles.openStatementText}>Open Statement</Text>
-            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <Modal
+          visible={errorModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setErrorModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalText}>
+                Statement not found. It hasn't been uploaded yet. Check back later.
+              </Text>
+              <TouchableOpacity
+                style={styles.contactSupportButton}
+                onPress={() => {
+                  setErrorModalVisible(false);
+                }}
+              >
+                <Text style={styles.contactSupportButtonText}>Contact Support</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        ))}
-      </ScrollView>
-    </View>
-  </SafeAreaView>
-);
-}
+        </Modal>
+      </View>
+    </SafeAreaView>
+  );
+};
+
 
 const styles = StyleSheet.create({
     cardInfoContainer: {
@@ -542,6 +534,34 @@ const styles = StyleSheet.create({
       openStatementText: {
         color: 'white', // Replace with your button text color
         fontSize: 14,
+      },
+      modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      },
+      modalContent: {
+        backgroundColor: 'white',
+        padding: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+      },
+      modalText: {
+        fontSize: 18,
+        marginBottom: 20,
+        textAlign: 'center',
+      },
+      contactSupportButton: {
+        backgroundColor: COLORS.primary,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 5,
+      },
+      contactSupportButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
       },
 })
 

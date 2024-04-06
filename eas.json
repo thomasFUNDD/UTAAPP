@@ -1,28 +1,22 @@
 {
   "build": {
-    "release": {
-      "distribution": "store",
+    "preview": {
       "android": {
         "buildType": "apk"
       }
     },
     "preview2": {
-      "distribution": "internal",
       "android": {
         "gradleCommand": ":app:assembleRelease"
       }
     },
     "preview3": {
-      "distribution": "internal",
-      "developmentClient": true,
-      "android": {
-        "buildType": "apk"
-      }
+      "developmentClient": true
     },
     "production": {
       "distribution": "store",
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       }
     }
   }

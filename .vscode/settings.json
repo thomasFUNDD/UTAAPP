@@ -1,0 +1,6 @@
+{
+    "laraphense.modelsPaths": [
+        "app",
+        "app/Models"
+    ]
+}

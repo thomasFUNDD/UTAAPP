@@ -5,20 +5,9 @@ import { useEffect } from 'react';
 import React from 'react';
 import { useColorScheme } from 'react-native';
 import { FONTS } from '../constants/fonts';
-
 import BalanceProvider from '../data/balanceProvider';
 import OtherContextProvider from '../data/otherContextProvider';
 
-import * as Sentry from '@sentry/react-native';
-
-Sentry.init({
-  dsn: 'https://18de0fb4a36e721c583de945a2e16bc3@o4506915884630016.ingest.us.sentry.io/4506915885678592',
-  release: '1.0.0',
-  dist: '1.0.0',
-  enableInExpoDevelopment: true,
-  debug: true,
-  integrations: [new Sentry.ExpoIntegration()],
-});
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -45,12 +34,13 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+      <RootLayoutNav />
+  );
 }
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-
 
   return (
     <OtherContextProvider>
@@ -73,7 +63,6 @@ function RootLayoutNav() {
             <Stack.Screen name="confirmpassword" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="requestmoney" options={{ headerShown: false }} />
-            <Stack.Screen name="pay" options={{ headerShown: false }} />
             <Stack.Screen name="topup" options={{ headerShown: false }} />
             <Stack.Screen name="topup_Alt" options={{ headerShown: false }} />
             <Stack.Screen name="yourcard" options={{ headerShown: false }} />

@@ -1,35 +1,27 @@
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated,FlatList } from 'react-native';
-import React, { useState, useEffect, useContext, memo,useCallback } from 'react';
-import '../../sentry-config'; // Path to your Sentry configuration file
-
-// ... other imports
-import { COLORS, images } from '../../constants'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { StatusBar } from 'expo-status-bar'
-import { Image } from 'expo-image'
-import { Octicons } from '@expo/vector-icons'
-import { useNavigation } from 'expo-router'
+import { ScrollView,Modal, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, FlatList } from 'react-native';
+import React, { useState, useEffect, useContext, memo, useCallback, useRef, lazy, Suspense } from 'react';
+import { COLORS, images } from '../../constants';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { Image } from 'expo-image';
+import { Octicons } from '@expo/vector-icons';
+import { useNavigation } from 'expo-router';
 import { TextInput } from 'react-native';
-import SubHeaderItem from '../../components/SubHeaderItem'
-import Card from '../../components/Card'
-import { userCards } from '../../data'
-import SavingCard from '../../components/SavingCard'
-import { ScrollView } from 'react-native-virtualized-view'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { API_URL, TOKEN } from '@env' // Import environment variables
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL, TOKEN } from '@env'; // Import environment variables
 import axios from 'axios';
-import BalanceProvider from '../../data/BalanceProvider'; // Adjust the path as necessary
 import BalanceContext from '../../data/balancesContext';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import otherContext from '../../data/otherContext';
-import otherContextProvider from '../../data/otherContextProvider';
 import OtherContext from '../../data/otherContext';
 import { InteractionManager } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { FaTicketAlt } from 'react-icons/fa';
 import { Ionicons } from 'react-native-vector-icons';
 import { Menu, Button } from 'react-native-paper';
 
+// Lazy load components
+const SubHeaderItem = lazy(() => import('../../components/SubHeaderItem'));
+const Card = lazy(() => import('../../components/Card'));
+const SavingCard = lazy(() => import('../../components/SavingCard'));
 
 export interface BalanceContextType {
   currentBalance: number;
@@ -40,12 +32,12 @@ type Nav = {
   navigate: (value: string) => void;
 };
 
-const SearchBar = ({ onSearch }) => {
+const SearchBar = memo(({ onSearch }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSearch = () => {
+  const handleSearch = useCallback(() => {
     onSearch(searchQuery);
-  };
+  }, [onSearch, searchQuery]);
 
   return (
     <View style={styles.searchContainer}>
@@ -61,16 +53,10 @@ const SearchBar = ({ onSearch }) => {
       </TouchableOpacity>
     </View>
   );
-};
+});
 
-const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
-  const [isContentLoaded, setContentLoaded] = useState(false);
-
-  useEffect(() => {
-    // Placeholder for any setup that needs to happen when the modal is visible
-  }, [isVisible]);
-
-  const formatTransactionDetail = (key, value) => {
+const TransactionModal = memo(({ isVisible, transaction, onRequestClose }) => {
+  const formatTransactionDetail = useCallback((key, value) => {
     let formattedKey = key.replace(/_/g, ' ');
     formattedKey = formattedKey.charAt(0).toUpperCase() + formattedKey.slice(1);
 
@@ -101,9 +87,9 @@ const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
     }
 
     return `${formattedKey}: ${formattedValue}`;
-  };
+  }, []);
 
-  const TransactionModalContent = memo(({ transaction }) => {
+  const TransactionModalContent = useCallback(({ transaction }) => {
     return (
       <View>
         <Text style={modalStyles.modalText}>Transaction Details</Text>
@@ -113,7 +99,7 @@ const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
         })}
       </View>
     );
-  });
+  }, [formatTransactionDetail]);
 
   return (
     <Modal transparent={true} visible={isVisible} onRequestClose={onRequestClose}>
@@ -131,7 +117,7 @@ const TransactionModal = ({ isVisible, transaction, onRequestClose }) => {
       </View>
     </Modal>
   );
-};
+});
 
 const HomeScreen = () => {
   const { navigate } = useNavigation<Nav>();
@@ -156,9 +142,29 @@ const HomeScreen = () => {
   const { panNumber, setPanNumber } = useContext(OtherContext);
   let runningBalance = currentBalance;
 
+  const [isExpanded, setIsExpanded] = useState(false);
+  const rotateAnimation = useRef(new Animated.Value(0)).current;
+
+  const toggleExpand = useCallback(() => {
+    setIsExpanded((prevState) => !prevState);
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(rotateAnimation, {
+      toValue: isExpanded ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [isExpanded, rotateAnimation]);
+
+  const rotateInterpolation = rotateAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
   const showTransactionModal = useCallback(
     (transaction) => {
-      requestAnimationFrame(() => {
+      InteractionManager.runAfterInteractions(() => {
         setSelectedTransaction(transaction);
         setIsModalVisible(true);
       });
@@ -166,16 +172,15 @@ const HomeScreen = () => {
     []
   );
 
-  const hideModal = () => {
-    requestAnimationFrame(() => {
+  const hideModal = useCallback(() => {
+    InteractionManager.runAfterInteractions(() => {
       setIsModalVisible(false);
       setSelectedTransaction(null);
     });
-  };
+  }, []);
 
-  const getTransactionIcon = (transaction) => {
+  const getTransactionIcon = useCallback((transaction) => {
     const transactionType = transaction.tt_id.toLowerCase();
-    console.log('Normalized transaction type:', transactionType);
 
     switch (transactionType) {
       case 'donation':
@@ -197,15 +202,15 @@ const HomeScreen = () => {
       default:
         return images.transferMoney;
     }
-  };
+  }, []);
 
   const TimeFullIcon = <Octicons name="person" size={28} color={COLORS.white} />;
   const TimeHalfIcon = <Octicons name="clock" size={28} color={COLORS.white} />;
   const TimeLowIcon = <Octicons name="alert" size={28} color={COLORS.white} />;
 
-  const determineTimeLeftIcon = () => {
+  const determineTimeLeftIcon = useCallback(() => {
     const minutesLeft = parseInt(timeLeft.split(':')[0], 10);
-    console.log('tre', minutesLeft);
+
     if (minutesLeft > 10) {
       return TimeFullIcon;
     } else if (minutesLeft > 5) {
@@ -213,9 +218,9 @@ const HomeScreen = () => {
     } else {
       return TimeLowIcon;
     }
-  };
+  }, [timeLeft]);
 
-  const TimeLeftDisplay = () => {
+  const TimeLeftDisplay = memo(() => {
     const [timeLeft, setTimeLeft] = useState('');
 
     useEffect(() => {
@@ -248,15 +253,13 @@ const HomeScreen = () => {
     }
 
     return <Octicons name="person" size={28} color={COLORS.white} />;
-  };
+  });
 
   const [balanceAnimatedValue] = useState(new Animated.Value(0));
-  const [iconAnimatedValues] = useState(userCards.map(() => new Animated.Value(0)));
 
   useEffect(() => {
     const checkAndFetchData = async () => {
       const token = await AsyncStorage.getItem('userToken');
-      console.log('userToken:', token);
 
       if (!token || token === '') {
         AsyncStorage.removeItem('userToken');
@@ -264,14 +267,13 @@ const HomeScreen = () => {
         AsyncStorage.setItem('dataFetched', 'false');
         navigate('login');
       }
-      console.log('fullName:', fullName);
+
       const dataFetched = await AsyncStorage.getItem('dataFetched');
-      console.log('dataFetched:', dataFetched);
+
       if (token) {
         await fetchData();
         await AsyncStorage.setItem('dataFetched', 'true');
       } else if (!fullName) {
-        console.log(fullName);
         await fetchData();
         await AsyncStorage.setItem('dataFetched', 'true');
       }
@@ -285,54 +287,19 @@ const HomeScreen = () => {
 
     checkAndFetchData();
 
-    const processTransactions = (transactions, balance) => {
-      if (!Array.isArray(transactions)) {
-        console.error('Expected transactions to be an array, received:', transactions);
-        return [];
-      }
-
-      const transactionsWithBalance = transactions.map((transaction) => {
-        return { ...transaction, balance };
-      });
-
-      return transactionsWithBalance;
-    };
-
-    const calculateTimeLeft = async () => {
-      const logoutTimestamp = await AsyncStorage.getItem('logoutTimestamp');
-      if (logoutTimestamp) {
-        const currentTime = new Date().getTime();
-        const timeLeft = parseInt(logoutTimestamp) - currentTime;
-
-        console.log(panNumber);
-        if (timeLeft > 0) {
-          setTimeout(() => {
-            const minutes = Math.floor(timeLeft / 1000 / 60);
-            const seconds = Math.floor((timeLeft / 1000) % 60);
-            setLogoutTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-          }, 1000);
-        } else {
-          AsyncStorage.removeItem('userToken');
-          setPanNumber(null);
-          await AsyncStorage.setItem('dataFetched', 'false');
-          navigate('login');
-        }
-      }
-    };
-
     const fetchData = async () => {
       const token = await AsyncStorage.getItem('userToken');
-    
+
       if (!token) {
         Alert.alert('No userToken', 'userToken is not set');
         return;
       }
-    
+
       const headers = {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       };
-    
+
       const urls = [
         `${API_URL}/client/accounts/general`,
         `${API_URL}/client/accounts/balances`,
@@ -346,7 +313,7 @@ const HomeScreen = () => {
         `${API_URL}/webdata/standingorders/unprocessed`,
         `${API_URL}/qpay/cards/pan`,
       ];
-    
+
       try {
         const responses = await Promise.all(
           urls.map((url) =>
@@ -363,7 +330,7 @@ const HomeScreen = () => {
             })
           )
         );
-    
+
         const [
           generalInfoResponse,
           balanceInfoResponse,
@@ -374,35 +341,35 @@ const HomeScreen = () => {
           standingOrdersResponse,
           cardDetailsResponse,
           transactionsResponse,
-          _,
           fourDigitNumberResponse,
         ] = responses;
-    
+
         const { firstname, lastname } = generalInfoResponse.data.general[0];
         const fullName = `${firstname} ${lastname}`;
         const { currentbalance } = balanceInfoResponse.data.balances[0];
-    
+
         Animated.timing(balanceAnimatedValue, {
           toValue: currentbalance,
           duration: 1000,
           useNativeDriver: false,
         }).start();
-    
+
         setCurrentBalance(currentbalance);
         setFullName(fullName);
-    
+
         if (Array.isArray(statementsResponse.data)) {
           setStatements(statementsResponse.data);
         }
-    
+
         if (generalInfoResponse.data.general && Array.isArray(generalInfoResponse.data.general)) {
           setAccountDetails(generalInfoResponse.data.general[0]);
         }
-    
+        const vaccountno = generalInfoResponse.data.general[0]?.vaccountno;
+
         if (voucherDetailsResponse.data && Array.isArray(voucherDetailsResponse.data.book_categories)) {
           setVoucherDetails(voucherDetailsResponse.data.summary);
         }
-    
+
         if (cardDetailsResponse.status !== 417 && fourDigitNumberResponse.status !== 417) {
           if (cardDetailsResponse.data && Array.isArray(cardDetailsResponse.data.cards)) {
             const updatedCardDetails = cardDetailsResponse.data.cards.map((card) => ({
@@ -413,28 +380,33 @@ const HomeScreen = () => {
             setCardDetails(updatedCardDetails);
           }
         }
-    
-        if (standingOrdersResponse.data && Array.isArray(standingOrdersResponse.data['standing orders'])) {
-          setStandingOrders(standingOrdersResponse.data['standing orders']);
+
+        if (standingOrdersResponse.data && Array.isArray(standingOrdersResponse.data['standing orders']) && vaccountno) {
+          const allStandingOrders = standingOrdersResponse.data['standing orders'];
+          const filteredStandingOrders = allStandingOrders.filter(order => order.accountno.toString() === vaccountno);
+          setStandingOrders(filteredStandingOrders);
+
+          const notAddedOrders = allStandingOrders.filter(order => order.accountno.toString() !== vaccountno);
         }
-    
+
         if (charitiesResponse.data && Array.isArray(charitiesResponse.data['charity details'])) {
           const filteredCharities = charitiesResponse.data['charity details'].filter(charity => charity.regchar && charity.regchar.toLowerCase() !== 'private');
-          
+
           const uniqueCharities = filteredCharities.reduce((acc, charity) => {
             if (!acc.some(c => c.charity === charity.charity)) {
               acc.push({
                 charity: charity.charity,
-                charityno: charity.charityno
+                charityno: charity.charityno,
+                regchar: charity.regchar,
               });
             }
             return acc;
           }, []);
-      
+
           setCharities(filteredCharities);
-          setUniqueCharities(uniqueCharities); // Add this line to set the uniqueCharities in the context
+          setUniqueCharities(uniqueCharities);
         }
-    
+
         if (Array.isArray(transactionsResponse.data['transactions per client'])) {
           const transactionData = transactionsResponse.data['transactions per client'];
           setTransactions(transactionData);
@@ -456,159 +428,11 @@ const HomeScreen = () => {
     return () => clearInterval(intervalId);
   }, []);
 
-  const renderBalanceCard = () => {
-    const [isExpanded, setIsExpanded] = useState(false);
+  const AccountStats = memo(({ accountBalance, donationsToday, totalDonations, vouchersHeld, standingOrders }) => {
+    return null;
+  });
 
-    const toggleExpand = () => {
-      setIsExpanded(!isExpanded);
-
-      Animated.parallel(
-        iconAnimatedValues.map((animatedValue, index) =>
-          Animated.timing(animatedValue, {
-            toValue: isExpanded ? 1 : 0,
-            duration: 300,
-            delay: index * 100,
-            useNativeDriver: true,
-          })
-        )
-      ).start();
-    };
-
-    const balanceInterpolation = balanceAnimatedValue.interpolate({
-      inputRange: [0, currentBalance],
-      outputRange: ['0', `${currentBalance.toFixed(2)}`],
-    });
-
-    return (
-      <View style={styles.balanceCard}>
-      <View style={styles.balanceCardView}>
-      <TouchableOpacity onPress={() => navigate("topup_Alt")} style={styles.balanceCardView}>
-        <Text style={styles.balanceText}>Available Balance</Text>
-        <Text style={styles.balanceValue}>£{currentBalance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</Text>
-      </TouchableOpacity>
-      </View>
-
-      
-      <View style={styles.featureColumn}>
-
-        <View style={styles.subfeatureColumn}>
-          <TouchableOpacity onPress={() => navigate("history")} style={styles.featureContainer}>
-            <View style={styles.featureIconContainer}>
-              <Image source={images.donate} contentFit='contain' style={styles.EvenlargerFeatureIcon} />
-            </View>
-            <Text style={styles.featureText}>Donate</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigate("transactionsRedesign")} style={styles.featureContainer}>
-            <View style={styles.featureIconContainer}>
-              <Image source={images.donateIcon} contentFit='contain' style={styles.featureIcon} />
-            </View>
-            <Text style={styles.featureText}>Transactions</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigate("standingOrder")} style={styles.featureContainer}>
-            <View style={styles.featureIconContainer}>
-              <Image 
-                source={images.calendarIconnew} 
-                contentFit='contain' 
-                style={[styles.featureIcon, styles.largerFeatureIcon]}
-              />
-            </View>
-            <Text style={styles.featureText}>Standing Orders</Text>
-          </TouchableOpacity>
-          
-          {!isExpanded && (
-  
-        <TouchableOpacity onPress={toggleExpand} style={styles.expandButton}>
-          <Ionicons name="add-circle-outline" size={24} color="#a98e63" />
-        </TouchableOpacity>
-      
-    )}
-
-          
-{isExpanded && (
-  <TouchableOpacity 
-    onPress={() => panNumber ? navigate("other") : navigate("orderCard")} 
-    style={styles.featureContainer}
-  >
-    <View style={styles.featureIconContainer}>
-      <Image source={images.cardDashboard} contentFit='contain' style={styles.EvenlargerFeatureIcon} />
-    </View>
-    <Text style={styles.featureText}>
-      {panNumber ? 'Card Dashboard' : 'Order Card'}
-    </Text>
-  </TouchableOpacity>
-)}
-
-    </View>
-      </View>
-      {isExpanded && (
-
-        <View style={styles.featureColumn}>
-          <View style={styles.subfeatureColumn2}>
-
-          <TouchableOpacity onPress={() => navigate("statements")} style={styles.featureContainer}>
-            <View style={styles.featureIconContainer}>
-              <Image source={images.statementIcon} contentFit='contain' style={styles.featureIcon} />
-            </View>
-            <Text style={styles.featureText}>Statements</Text>
-          </TouchableOpacity>
-           
-            <TouchableOpacity onPress={() => navigate("CreateReceipt")} style={styles.featureContainer}>
-              <View style={styles.featureIconContainer}>
-                <Image source={images.receipt} contentFit='contain' style={styles.featureIcon} />
-              </View>
-              <Text style={styles.featureText}>Receipts</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigate("orderVouchers")} style={styles.featureContainer}>
-              <View style={styles.featureIconContainer}>
-                <Image source={images.tag} contentFit='contain' style={styles.featureIcon} />
-              </View>
-              <Text style={styles.featureText}>Vouchers</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigate("profile")} style={styles.featureContainer}>
-              <View style={styles.featureIconContainer}>
-                <Image source={images.profile} contentFit='contain' style={styles.featureIcon} />
-              </View>
-              <Text style={styles.featureText}>Settings</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      {isExpanded && (
-        <View style={{backgroundColor: 'white', marginLeft:70, marginRight:70, borderRadius: 10, top:-20}}>
-          <TouchableOpacity onPress={toggleExpand} style={styles.expandButton}>
-            <Ionicons name="remove-circle-outline" size={24} color="#a98e63" />
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-    );
-
-  };
-
-  const renderAllDebitCard = () => {
-    return (
-      <View style={{ paddingHorizontal: 20 }}>
-        <FlatList
-          horizontal
-          data={userCards}
-          keyExtractor={(item, index) => index.toString()}
-          renderItem={({ item, index }) => (
-            <Card
-              number={item.number}
-              balance={item.balance}
-              date={item.date}
-              onPress={() => console.log('Card Pressed')}
-              animatedValue={iconAnimatedValues[index]}
-            />
-          )}
-        />
-      </View>
-    );
-  };
-
-  const AccountStats = ({ accountBalance, donationsToday, totalDonations, vouchersHeld, standingOrders }) => {};
-
-  const StatItem = ({ title, value, icon }) => {
+  const StatItem = memo(({ title, value, icon }) => {
     return (
       <View style={statsStyles.statItem}>
         <Image source={icon} style={statsStyles.statIcon} />
@@ -616,7 +440,7 @@ const HomeScreen = () => {
         <Text style={statsStyles.statValue}>{value}</Text>
       </View>
     );
-  };
+  });
 
   const accountStatsData = {
     accountBalance: 4388.01,
@@ -650,7 +474,104 @@ const HomeScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-        {renderBalanceCard()}
+
+        <View style={styles.balanceCard}>
+          <View style={styles.balanceCardView}>
+            <TouchableOpacity onPress={() => navigate("topup_Alt")} style={styles.balanceCardView}>
+              <Text style={styles.balanceText}>Available Balance</Text>
+              <Text style={styles.balanceValue}>£{currentBalance.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.featureColumn}>
+            <View style={styles.subfeatureColumn}>
+              <TouchableOpacity onPress={() => navigate("history")} style={styles.featureContainer}>
+                <View style={styles.featureIconContainer}>
+                  <Image source={images.donate} contentFit='contain' style={styles.EvenlargerFeatureIcon} />
+                </View>
+                <Text style={styles.featureText}>Donate</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigate("transactionsRedesign")} style={styles.featureContainer}>
+                <View style={styles.featureIconContainer}>
+                  <Image source={images.donateIcon} contentFit='contain' style={styles.featureIcon} />
+                </View>
+                <Text style={styles.featureText}>Transactions</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigate("standingOrder")} style={styles.featureContainer}>
+                <View style={styles.featureIconContainer}>
+                  <Image 
+                    source={images.calendarIconnew} 
+                    contentFit='contain' 
+                    style={[styles.featureIcon, styles.largerFeatureIcon]}
+                  />
+                </View>
+                <Text style={styles.featureText}>Standing Orders</Text>
+              </TouchableOpacity>
+              
+              {!isExpanded && (
+                <TouchableOpacity onPress={toggleExpand} style={styles.expandButton}>
+                  <Animated.View style={{ transform: [{ rotate: rotateInterpolation }] }}>
+                    <Ionicons name="add-circle-outline" size={24} color="#a98e63" />
+                  </Animated.View>
+                </TouchableOpacity>
+              )}
+
+              {isExpanded && (
+                <TouchableOpacity 
+                  onPress={() => panNumber ? navigate("other") : navigate("orderCard")} 
+                  style={styles.featureContainer}
+                >
+                  <View style={styles.featureIconContainer}>
+                    <Image source={images.cardDashboard} contentFit='contain' style={styles.EvenlargerFeatureIcon} />
+                  </View>
+                  <Text style={styles.featureText}>
+                    {panNumber ? 'Card Dashboard' : 'Order Card'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+          
+          {isExpanded && (
+            <View style={styles.featureColumn}>
+              <View style={styles.subfeatureColumn2}>
+                <TouchableOpacity onPress={() => navigate("statements")} style={styles.featureContainer}>
+                  <View style={styles.featureIconContainer}>
+                    <Image source={images.statementIcon} contentFit='contain' style={styles.featureIcon} />
+                  </View>
+                  <Text style={styles.featureText}>Statements</Text>
+                </TouchableOpacity>
+                  
+                <TouchableOpacity onPress={() => navigate("CreateReceipt")} style={styles.featureContainer}>
+                  <View style={styles.featureIconContainer}>
+                    <Image source={images.receipt} contentFit='contain' style={styles.featureIcon} />
+                  </View>
+                  <Text style={styles.featureText}>Receipts</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => navigate("orderVouchers")} style={styles.featureContainer}>
+                  <View style={styles.featureIconContainer}>
+                    <Image source={images.tag} contentFit='contain' style={styles.featureIcon} />
+                  </View>
+                  <Text style={styles.featureText}>Vouchers</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => navigate("profile")} style={styles.featureContainer}>
+                  <View style={styles.featureIconContainer}>
+                    <Image source={images.profile} contentFit='contain' style={styles.featureIcon} />
+                  </View>
+                  <Text style={styles.featureText}>Settings</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {isExpanded && (
+            <View style={{backgroundColor: 'white', marginLeft:70, marginRight:70, borderRadius: 10, top:-20}}>
+              <TouchableOpacity onPress={toggleExpand} style={styles.expandButton}>
+                <Ionicons name="remove-circle-outline" size={24} color="#a98e63" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
         <ScrollView style={{ top: -40 }}>
           <AccountStats
@@ -659,7 +580,9 @@ const HomeScreen = () => {
             vouchersHeld={accountStatsData.vouchersHeld}
             standingOrders={accountStatsData.standingOrders}
           />
-          <SubHeaderItem title="Recent Transactions" subtitle="View All" onPress={() => navigate('transactionsRedesign')} />
+          <Suspense fallback={<ActivityIndicator />}>
+            <SubHeaderItem title="Recent Transactions" subtitle="View All" onPress={() => navigate('transactionsRedesign')} />
+          </Suspense>
 
           {transactions.slice(0, 22).map((transaction, index) => {
             let displayHeader = null;
@@ -674,17 +597,18 @@ const HomeScreen = () => {
             }
 
             return (
-              <SavingCard
-                key={index.toString()}
-                header={displayHeader}
-                title={transaction['payment reference'] ? transaction['payment reference'] : transaction.dc_description}
-                subtitle={`Date: ${transactionDate}`}
-                icon={getTransactionIcon(transaction)}
-                percentage={60}
-                transactionAmount={transaction['credit'] > 0 ? `+£${transaction['credit'].toFixed(2)}` : `-£${transaction['debit'].toFixed(2)}`}
-                onPress={() => showTransactionModal(transaction)}
-                imageStyle={{ transform: [{ scale: 0.2 }] }}
-              />
+              <Suspense key={index.toString()} fallback={<ActivityIndicator />}>
+                <SavingCard
+                  header={displayHeader}
+                  title={transaction['payment reference'] ? transaction['payment reference'] : transaction.dc_description}
+                  subtitle={`Date: ${transactionDate}`}
+                  icon={getTransactionIcon(transaction)}
+                  percentage={60}
+                  transactionAmount={transaction['credit'] > 0 ? `+£${transaction['credit'].toFixed(2)}` : `-£${transaction['debit'].toFixed(2)}`}
+                  onPress={() => showTransactionModal(transaction)}
+                  imageStyle={{ transform: [{ scale: 0.2 }] }}
+                />
+              </Suspense>
             );
           })}
           <TransactionModal isVisible={isModalVisible} transaction={selectedTransaction} onRequestClose={hideModal} />
@@ -693,7 +617,6 @@ const HomeScreen = () => {
     </SafeAreaView>
   );
 };
-
 
 const modalStyles = StyleSheet.create({
   centeredView: {

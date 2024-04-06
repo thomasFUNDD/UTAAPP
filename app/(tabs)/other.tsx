@@ -109,7 +109,7 @@ useEffect(() => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          mobileNumber: mobileNumber,
+          mobileNumber: "+447389067730",
           // Include any sdfdsotdsfdsher data expected by your PHP script
         }),
       });

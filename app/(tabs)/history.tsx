@@ -1,3 +1,4 @@
+
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, TouchableWithoutFeedback, Switch, FlatList, ActivityIndicator,ScrollView } from 'react-native';
 import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -112,9 +113,16 @@ const SendScreen = () => {
     const [inputValue, setInputValue] = useState("");
     const { uniqueCharities } = useContext(OtherContext);
   
-    const filteredCharities = useMemo(() => inputValue.trim() === "" ? uniqueCharities : uniqueCharities.filter(charity =>
-      charity.charity.toLowerCase().includes(inputValue.toLowerCase())
-    ), [inputValue, uniqueCharities]);
+    const filteredCharities = useMemo(() => {
+      if (inputValue.trim() === "") {
+        return uniqueCharities;
+      } else {
+        return uniqueCharities.filter(charity =>
+          charity.charity.toLowerCase().includes(inputValue.toLowerCase()) ||
+          (charity.regchar && charity.regchar.toLowerCase().includes(inputValue.toLowerCase()))
+        );
+      }
+    }, [inputValue, uniqueCharities]);
   
     const handleSearchChange = useCallback((value) => {
       setInputValue(value);
@@ -143,7 +151,7 @@ const SendScreen = () => {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.searchBarContainer}>
             <TextInput
-              placeholder="Search for a charity"
+              placeholder="Search for a charity or Reg Charity No"
               value={inputValue}
               onChangeText={handleSearchChange}
               style={styles.searchBar}
@@ -381,270 +389,273 @@ const SendScreen = () => {
     }
   }, [inputValue, selectedBankAccount, specialInstructions, selectedCharityNo, vaccountno]);
 
-  const handleTextChange = useCallback((text) => {
-    setInputValue(text);
-  }, []);
 
-  const renderModal = useCallback(() => {
-    return (
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => {
-          setModalVisible(false);
-          resetStates();
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalWindow}>
-            <Text style={styles.modalTitle}>Donation Successful</Text>
-            <Text style={styles.modalText}>The donation will be sent once approved</Text>
-            <View style={styles.modalButtonContainer}>
-              <Button
-                title="Home"
-                filled
-                onPress={() => {
-                  setModalVisible(false);
-                  navigation.navigate('index');
-                }}
-                style={styles.modalButton}
-              />
-              <Button
-                title="New Donation"
-                onPress={() => {
-                  setModalVisible(false);
-                  resetStates();
-                }}
-                style={styles.modalButton}
-              />
-            </View>
+const handleTextChange = useCallback((text) => {
+  setInputValue(text);
+}, []);
+
+const renderModal = useCallback(() => {
+  return (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={modalVisible}
+      onRequestClose={() => {
+        setModalVisible(false);
+        resetStates();
+      }}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalWindow}>
+          <Text style={styles.modalTitle}>Donation Successful</Text>
+          <Text style={styles.modalText}>The donation will be sent once approved</Text>
+          <View style={styles.modalButtonContainer}>
+            <Button
+              title="Home"
+              filled
+              onPress={() => {
+                setModalVisible(false);
+                navigation.navigate('index');
+              }}
+              style={styles.modalButton}
+            />
+            <Button
+              title="New Donation"
+              onPress={() => {
+                setModalVisible(false);
+                resetStates();
+              }}
+              style={styles.modalButton}
+            />
           </View>
         </View>
-      </Modal>
-    );
-  }, [modalVisible, navigation, resetStates]);
+      </View>
+    </Modal>
+  );
+}, [modalVisible, navigation, resetStates]);
 
-  const renderContent = useMemo(() => {
-    return (
-      <>
-        <ScrollView>
-          <View style={styles.detailsContainer}>
-            {(selectedCharity && selectedBankAccount) && !donationEditVisible && (
-              <View style={styles.detailsBox}>
-                <View style={styles.detailsRow}>
-                  <View style={styles.detailsTextContainer}>
-                    <Text style={styles.detailsText}>Charity: {selectedCharity}</Text>
-                    <Text style={styles.detailsText}>
-                      Sort Code: {
-                        filteredBankAccounts.find(account => account.bnk_account_no === selectedBankAccount)?.bnk_sort_code || "No Sort Code Selected"
-                      }
-                    </Text>
-                    <Text style={styles.detailsText}>Account Number: {selectedBankAccount}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setDonationEditVisible(true)} style={styles.editButton}>
-                    <Icon name="edit" size={24} color={COLORS.primary} />
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-            {donationEditVisible && (
-              <>
-                <Text style={styles.sectionTitle}>Charity</Text>
-                <TouchableOpacity onPress={() => setCharityModalVisible(true)} style={styles.charityButton}>
-                  <Text style={styles.charityButtonText} numberOfLines={1} ellipsizeMode="tail">
-                    {selectedCharity ? selectedCharity : "Select Charity"}
-                  </Text>
-                </TouchableOpacity>
-                <CharitySelectionModal
-                  visible={charityModalVisible}
-                  onClose={() => setCharityModalVisible(false)}
-                  setSelectedCharity={setSelectedCharity}
-                  setSelectedCharityNo={setSelectedCharityNo}
-                  charities={charities}
-                />
-                <Text style={styles.sectionTitle}>Bank Account</Text>
-                <TouchableOpacity onPress={() => setBankDetailsModalVisible(true)} style={styles.bankDetailsButton}>
-                  {selectedBankAccount ? (
-                    <>
-                      <Text style={styles.bankDetailsText} numberOfLines={1} ellipsizeMode="tail">
-                        Sort Code: {filteredBankAccounts.find(account => account.bnk_account_no === selectedBankAccount)?.bnk_sort_code}
-                      </Text>
-                      <Text style={styles.bankDetailsText} numberOfLines={1} ellipsizeMode="tail">
-                        Account No: {selectedBankAccount}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.bankDetailsText}>Choose Bank Account</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setDonationEditVisible(false)} style={styles.cancelButton}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </>
-            )}
-            {(!selectedCharity || !selectedBankAccount) && !donationEditVisible && (
-              <>
-                <Text style={styles.sectionTitle}>Charity</Text>
-                <TouchableOpacity onPress={() => setCharityModalVisible(true)} style={styles.charityButton}>
-                  <Text style={styles.charityButtonText} numberOfLines={1} ellipsizeMode="tail">
-                    {selectedCharity ? selectedCharity : "Select Charity"}
-                  </Text>
-                </TouchableOpacity>
-                <CharitySelectionModal
-                  visible={charityModalVisible}
-                  onClose={() => setCharityModalVisible(false)}
-                  setSelectedCharity={setSelectedCharity}
-                  setSelectedCharityNo={setSelectedCharityNo}
-                  charities={charities}
-                />
-                <Text style={styles.sectionTitle}>Bank Account</Text>
-                <TouchableOpacity onPress={() => setBankDetailsModalVisible(true)} style={styles.bankDetailsButton}>
-                  {selectedBankAccount ? (
-                    <>
-                      <Text style={styles.bankDetailsText} numberOfLines={1} ellipsizeMode="tail">
-                        Sort Code: {filteredBankAccounts.find(account => account.bnk_account_no === selectedBankAccount)?.bnk_sort_code}
-                      </Text>
-                      <Text style={styles.bankDetailsText} numberOfLines={1} ellipsizeMode="tail">
-                        Account No: {selectedBankAccount}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.bankDetailsText}>Choose Bank Account</Text>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
-            {renderBankDetailsModal()}
-            <Text style={styles.sectionTitle}>Donation Amount</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputPrefix}>£</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                onChangeText={handleTextChange}
-                value={inputValue}
-                placeholder="Enter amount"
-              />
-            </View>
-            <Text style={styles.sectionTitle}>Donation Date</Text>
-            <TouchableOpacity
-              onPress={() => setPickerVisible(true)}
-              style={styles.datePickerButton}
-            >
-              <Text style={styles.datePickerButtonText}>{selectedDate ? selectedDate.toLocaleDateString() : new Date().toLocaleDateString()}</Text>
-            </TouchableOpacity>
-            <CustomDatePicker
-              isVisible={isPickerVisible}
-              onClose={() => setPickerVisible(false)}
-              onSelectDate={setSelectedDate}
-            />
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchText}>Add Donation Reference</Text>
-              <Switch
-                onValueChange={() => setShowDonationReference(!showDonationReference)}
-                value={showDonationReference}
-                trackColor={{ false: "#767577", true: COLORS.primary }}
-                thumbColor={showDonationReference ? COLORS.primary : "#f4f3f4"}
-              />
-            </View>
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchText}>Add Special Instructions</Text>
-              <Switch
-                onValueChange={toggleSwitch}
-                value={showSpecialInstructions}
-                trackColor={{ false: "#767577", true: COLORS.primary }}
-                thumbColor={showSpecialInstructions ? COLORS.primary : "#f4f3f4"}
-              />
-            </View>
-            {showDonationReference && (
-              <>
-                <Text style={styles.sectionTitle}>Enter Donation Reference</Text>
-                <TextInput
-                  style={styles.textArea}
-                  multiline={true}
-                  numberOfLines={2}
-                  onChangeText={setDonationReference}
-                  value={donationReference}
-                  placeholder="Reference..."
-                />
-              </>
-            )}
-            {showSpecialInstructions && (
-              <>
-                <Text style={styles.sectionTitle}>Enter Special Instructions</Text>
-                <TextInput
-                  style={styles.textArea}
-                  multiline={true}
-                  numberOfLines={4}
-                  onChangeText={setSpecialInstructions}
-                  value={specialInstructions}
-                  placeholder="Instructions..."
-                />
-              </>
-            )}
-            <Button
-              title="Donate"
-              onPress={sendDonation}
-              filled
-              style={styles.donateButton}
-            />
-          </View>
-        </ScrollView>
-      </>
-    );
-  }, [
-    selectedCharity,
-    selectedBankAccount,
-    filteredBankAccounts,
-    donationEditVisible,
-    setDonationEditVisible,
-    charityModalVisible,
-    setCharityModalVisible,
-    setSelectedCharity,
-    setSelectedCharityNo,
-    bankDetailsModalVisible,
-    setBankDetailsModalVisible,
-    renderBankDetailsModal,
-    inputValue,
-    handleTextChange,
-    selectedDate,
-    isPickerVisible,
-    setPickerVisible,
-    setSelectedDate,
-    showDonationReference,
-    setShowDonationReference,
-    showSpecialInstructions,
-    toggleSwitch,
-    donationReference,
-    setDonationReference,
-    specialInstructions,
-    setSpecialInstructions,
-    sendDonation,
-    charities,
-  ]);
-  
+const renderContent = useMemo(() => {
   return (
     <>
-      <SafeAreaView style={{ flex: 0, backgroundColor: COLORS.primary }}>
-        {renderHeader()}
-      </SafeAreaView>
-      <SafeAreaView style={styles.container}>
-        <KeyboardAwareScrollView style={styles.contentContainer}>
-          {renderCardInfo()}
-          {isLoading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} style={styles.loadingIndicator} />
-          ) : (
-            renderContent
+      <ScrollView>
+        <View style={styles.detailsContainer}>
+          {(selectedCharity && selectedBankAccount) && !donationEditVisible && (
+            <View style={styles.detailsBox}>
+              <View style={styles.detailsRow}>
+                <View style={styles.detailsTextContainer}>
+                  <Text style={styles.detailsText}>Charity: {selectedCharity}</Text>
+                  <Text style={styles.detailsText}>
+                    Sort Code: {
+                      filteredBankAccounts.find(account => account.bnk_account_no === selectedBankAccount)?.bnk_sort_code || "No Sort Code Selected"
+                    }
+                  </Text>
+                  <Text style={styles.detailsText}>Account Number: {selectedBankAccount}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setDonationEditVisible(true)} style={styles.editButton}>
+                  <Icon name="edit" size={24} color={COLORS.primary} />
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
-        </KeyboardAwareScrollView>
-        {renderModal()}
-      </SafeAreaView>
+          {donationEditVisible && (
+            <>
+              <Text style={styles.sectionTitle}>Charity</Text>
+              <TouchableOpacity onPress={() => setCharityModalVisible(true)} style={styles.charityButton}>
+                <Text style={styles.charityButtonText} numberOfLines={1} ellipsizeMode="tail">
+                  {selectedCharity ? selectedCharity : "Select Charity"}
+                </Text>
+              </TouchableOpacity>
+              <CharitySelectionModal
+                visible={charityModalVisible}
+                onClose={() => setCharityModalVisible(false)}
+                setSelectedCharity={setSelectedCharity}
+                setSelectedCharityNo={setSelectedCharityNo}
+                charities={charities}
+              />
+              <Text style={styles.sectionTitle}>Bank Account</Text>
+              <TouchableOpacity onPress={() => setBankDetailsModalVisible(true)} style={styles.bankDetailsButton}>
+                {selectedBankAccount ? (
+                  <>
+                    <Text style={styles.bankDetailsText} numberOfLines={1} ellipsizeMode="tail">
+                      Sort Code: {filteredBankAccounts.find(account => account.bnk_account_no === selectedBankAccount)?.bnk_sort_code}
+                    </Text>
+                    <Text style={styles.bankDetailsText} numberOfLines={1} ellipsizeMode="tail">
+                      Account No: {selectedBankAccount}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.bankDetailsText}>Choose Bank Account</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setDonationEditVisible(false)} style={{ backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 8, marginVertical: 8 }}>
+                <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {(!selectedCharity || !selectedBankAccount) && !donationEditVisible && (
+            <>
+              <Text style={styles.sectionTitle}>Charity</Text>
+              <TouchableOpacity onPress={() => setCharityModalVisible(true)} style={styles.charityButton}>
+                <Text style={styles.charityButtonText} numberOfLines={1} ellipsizeMode="tail">
+                  {selectedCharity ? selectedCharity : "Select Charity"}
+                </Text>
+              </TouchableOpacity>
+              <CharitySelectionModal
+                visible={charityModalVisible}
+                onClose={() => setCharityModalVisible(false)}
+                setSelectedCharity={setSelectedCharity}
+                setSelectedCharityNo={setSelectedCharityNo}
+                charities={charities}
+              />
+              <Text style={styles.sectionTitle}>Bank Account</Text>
+              <TouchableOpacity onPress={() => setBankDetailsModalVisible(true)} style={styles.bankDetailsButton}>
+                {selectedBankAccount ? (
+                  <>
+                    <Text style={styles.bankDetailsText} numberOfLines={1} ellipsizeMode="tail">
+                      Sort Code: {filteredBankAccounts.find(account => account.bnk_account_no === selectedBankAccount)?.bnk_sort_code}
+                    </Text>
+                    <Text style={styles.bankDetailsText} numberOfLines={1} ellipsizeMode="tail">
+                      Account No: {selectedBankAccount}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.bankDetailsText}>Choose Bank Account</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+          {renderBankDetailsModal()}
+          <Text style={styles.sectionTitle}>Donation Amount</Text>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputPrefix}>£</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              onChangeText={handleTextChange}
+              value={inputValue}
+              placeholder="Enter amount"
+            />
+          </View>
+          <Text style={styles.sectionTitle}>Donation Date</Text>
+          <TouchableOpacity
+            onPress={() => setPickerVisible(true)}
+            style={styles.datePickerButton}
+          >
+            <Text style={styles.datePickerButtonText}>
+              {selectedDate ? selectedDate.toLocaleDateString() : new Date().toLocaleDateString()}
+            </Text>
+          </TouchableOpacity>
+          <CustomDatePicker
+            isVisible={isPickerVisible}
+            onClose={() => setPickerVisible(false)}
+            onSelectDate={setSelectedDate}
+          />
+          <View style={styles.switchContainer}>
+            <Text style={styles.switchText}>Add Donation Reference</Text>
+            <Switch
+              onValueChange={() => setShowDonationReference(!showDonationReference)}
+              value={showDonationReference}
+              trackColor={{ false: "#767577", true: COLORS.primary }}
+              thumbColor={showDonationReference ? COLORS.primary : "#f4f3f4"}
+            />
+          </View>
+          <View style={styles.switchContainer}>
+            <Text style={styles.switchText}>Add Special Instructions</Text>
+            <Switch
+              onValueChange={toggleSwitch}
+              value={showSpecialInstructions}
+              trackColor={{ false: "#767577", true: COLORS.primary }}
+              thumbColor={showSpecialInstructions ? COLORS.primary : "#f4f3f4"}
+            />
+          </View>
+          {showDonationReference && (
+            <>
+              <Text style={styles.sectionTitle}>Enter Donation Reference</Text>
+              <TextInput
+                style={styles.textArea}
+                multiline={true}
+                numberOfLines={2}
+                onChangeText={setDonationReference}
+                value={donationReference}
+                placeholder="Reference..."
+              />
+            </>
+          )}
+          {showSpecialInstructions && (
+            <>
+              <Text style={styles.sectionTitle}>Enter Special Instructions</Text>
+              <TextInput
+                style={styles.textArea}
+                multiline={true}
+                numberOfLines={4}
+                onChangeText={setSpecialInstructions}
+                value={specialInstructions}
+                placeholder="Instructions..."
+              />
+            </>
+          )}
+          <Button
+            title="Donate"
+            onPress={sendDonation}
+            filled
+            style={styles.donateButton}
+          />
+        </View>
+      </ScrollView>
     </>
   );
-  
-  };
+}, [
+  selectedCharity,
+  selectedBankAccount,
+  filteredBankAccounts,
+  donationEditVisible,
+  setDonationEditVisible,
+  charityModalVisible,
+  setCharityModalVisible,
+  setSelectedCharity,
+  setSelectedCharityNo,
+  bankDetailsModalVisible,
+  setBankDetailsModalVisible,
+  renderBankDetailsModal,
+  inputValue,
+  handleTextChange,
+  selectedDate,
+  isPickerVisible,
+  setPickerVisible,
+  setSelectedDate,
+  showDonationReference,
+  setShowDonationReference,
+  showSpecialInstructions,
+  toggleSwitch,
+  donationReference,
+  setDonationReference,
+  specialInstructions,
+  setSpecialInstructions,
+  sendDonation,
+  charities,
+]);
+
+return (
+  <>
+    <SafeAreaView style={{ flex: 0, backgroundColor: COLORS.primary }}>
+      {renderHeader()}
+    </SafeAreaView>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAwareScrollView style={styles.contentContainer}>
+        {renderCardInfo()}
+        {isLoading ? (
+          <ActivityIndicator size="large" color={COLORS.primary} style={styles.loadingIndicator} />
+        ) : (
+          renderContent
+        )}
+      </KeyboardAwareScrollView>
+      {renderModal()}
+    </SafeAreaView>
+  </>
+);
+
+};
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -662,12 +673,14 @@ const SendScreen = () => {
       marginBottom: 48, // Increase the bottom margin
     },
     headerContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center", // Add this line to center the content vertically
       paddingHorizontal: 16,
-
+      paddingTop: 30,
+      marginBottom: 16,
       backgroundColor: COLORS.primary,
-      height: 78,
+      height: 58,
     },
     backIcon: {
       width: 24,
@@ -949,15 +962,18 @@ const SendScreen = () => {
       backgroundColor: 'white',
     },
     searchBarContainer: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      backgroundColor: '#F5F5F5',
-    },
-    searchBar: {
+      paddingHorizontal: 24,
+      paddingVertical: 24, // increase vertical padding
+      backgroundColor: COLORS.primary,
+      },
+      searchBar: {
       backgroundColor: 'white',
-      borderRadius: 4,
-      paddingHorizontal: 8,
-    },
+      borderRadius: 8, // increase border radius for rounded corners
+      paddingHorizontal: 16, // add more horizontal padding
+      paddingVertical: 12, // increase vertical padding
+      fontSize: 16, // slightly larger font size
+      height: 60, // increase height, e.g. 48 pixels
+      },
     charityList: {
       flex: 1,
     },

@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity,SafeAreaView,ScrollView, StyleSheet, Modal, TouchableWithoutFeedback, SectionList, FlatList, } from 'react-native'
+import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet, Modal, TouchableWithoutFeedback, SectionList, FlatList } from 'react-native'
 import React, { useState, useEffect, useContext, useRef } from 'react';
 
 import { TextInput } from 'react-native';
@@ -25,7 +25,7 @@ type Nav = {
 }
 
 
-const data = [1, 2, 5, 20,25, 50, 100, 500, 1000, 2500];
+const data = [1, 2, 5, 20, 25, 50, 100, 500, 1000, 2500];
 
 
 const Container: React.FC<ContainerProps> = ({ item, isSelected, onSelect }) => (
@@ -58,332 +58,189 @@ const SendScreen = () => {
     const [stickyHeader, setStickyHeader] = useState('');
     const flatListRef = useRef(null);
 
-    const [selectedQuantity, setSelectedQuantity] = useState('');
-
-    const [quantity100x50p, setQuantity100x50p] = useState('');
-    const [quantity50x1, setQuantity50x1] =  useState('');
-    const [quantity50x2, setQuantity50x2] = useState('');
-    const [quantity50x3, setQuantity50x3] = useState('');
-    const [quantity50x5, setQuantity50x5] = useState('');
-    const [quantity50x10, setQuantity50x10] = useState('');
-    const [quantity50x15, setQuantity50x15] = useState('');
-    const [quantity50x18, setQuantity50x18] = useState('');
-    const [quantity50x20, setQuantity50x20] = useState('');
-    const [quantity50x25, setQuantity50x25] = useState('');
-    const [quantity50x36, setQuantity50x36] = useState('');
-    const [quantity50x50, setQuantity50x50] = useState('');
-    const [quantity50x72, setQuantity50x72] = useState('');
-    const [quantity50x100, setQuantity50x100] = useState('');
-    const [quantity50x0, setQuantity50x0] = useState('');
-
     const [searchTerm, setSearchTerm] = useState('');
     const [totalFaceValue, setTotalFaceValue] = useState(0);
 
+    const [quantities, setQuantities] = useState({
+        quantity100x50p: '',
+        quantity50x1: '',
+        quantity50x2: '',
+        quantity50x3: '',
+        quantity50x5: '',
+        quantity50x10: '',
+        quantity50x15: '',
+        quantity50x18: '',
+        quantity50x20: '',
+        quantity50x25: '',
+        quantity50x36: '',
+        quantity50x50: '',
+        quantity50x72: '',
+        quantity50x100: '',
+        quantity50x0: '',
+    });
+
+    const handleQuantityChange = (key, value) => {
+        setQuantities((prevQuantities) => ({
+            ...prevQuantities,
+            [key]: value,
+        }));
+        calculateTotalFaceValue();
+    };
+
+    const calculateTotalFaceValue = () => {
+        const total =
+            parseInt(quantities.quantity50x1) * 50 +
+            parseInt(quantities.quantity50x2) * 100 +
+            parseInt(quantities.quantity50x3) * 150 +
+            parseInt(quantities.quantity50x5) * 250 +
+            parseInt(quantities.quantity50x10) * 500 +
+            parseInt(quantities.quantity50x15) * 750 +
+            parseInt(quantities.quantity50x18) * 900 +
+            parseInt(quantities.quantity50x20) * 1000 +
+            parseInt(quantities.quantity50x25) * 1250 +
+            parseInt(quantities.quantity50x36) * 1800 +
+            parseInt(quantities.quantity50x50) * 2500 +
+            parseInt(quantities.quantity50x72) * 3600 +
+            parseInt(quantities.quantity50x100) * 5000 +
+            parseInt(quantities.quantity50x0) * 0;
+        setTotalFaceValue(total);
+    };
+
     const handleOrder = () => {
-      // Process the order here
-      console.log(`Ordered quantity: ${selectedQuantity}`);
+        // Process the order here
+        console.log(`Ordered quantities: ${JSON.stringify(quantities)}`);
     };
 
     const renderHeader = () => {
-      return (
-          <View style={styles.headerContainer}>
-              <TouchableOpacity
-                  onPress={() => navigation.goBack()}
-              >
-                 
-                
-              </TouchableOpacity>
-              <Text style={styles.title}>Order Books</Text>
-              <TouchableOpacity>
-              </TouchableOpacity>
-          </View>
-      )
-  }
+        return (
+            <View style={styles.headerContainer}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                >
+                </TouchableOpacity>
+                <Text style={styles.title}>Order Booksdfs</Text>
+                <TouchableOpacity>
+                </TouchableOpacity>
+            </View>
+        )
+    }
 
-  const calculateTotalFaceValue = () => {
-    const total =
-      quantity50x1 * 50 + // Assuming each book of £1 vouchers has a face value of 50
-      quantity50x2 * 100 +
-      quantity50x3 * 150 +
-      quantity50x5 * 250 +
-      quantity50x10 * 500 +
-      quantity50x15 * 750 +
-      quantity50x18 * 900 +
-      quantity50x20 * 1000 +
-      quantity50x25 * 1250 +
-      quantity50x36 * 1800 +
-      quantity50x50 * 2500 +
-      quantity50x72 * 3600 +
-      quantity50x100 * 5000 +
-      quantity50x0 * 0
-    ;
-    setTotalFaceValue(total);
-  };
- 
-    
-    
+    return (
+        <View style={styles.container}>
+            {renderHeader()}
+            <FlatList
+                data={[
+                    { key: 'prepaid', title: 'Pre-Paid vouchers' },
+                    { key: 'preprinted', title: 'Pre-Printed Voucher Books' },
+                    { key: 'blank', title: 'Blank voucher books' },
+                    { key: 'total', title: 'Order Total' },
+                ]}
+                renderItem={({ item }) => {
+                    switch (item.key) {
+                        case 'prepaid':
+                            return (
+                                <>
+                                    <Text style={styles.subHeading}>{item.title}</Text>
+                                    <Text style={styles.minorHeadings}>Book of 100 vouchers x 50p vouchers</Text>
+                                    <Picker
+                                        selectedValue={quantities.quantity50x50}
+                                        onValueChange={(itemValue) => handleQuantityChange('quantity50x50', itemValue)}
+                                        style={styles.picker}
+                                    >
+                                        <Picker.Item label="Book Quantity" value="" />
+                                        {[...Array(51).keys()].map((i) => (
+                                            <Picker.Item key={i} label={`${i}`} value={i.toString()} />
+                                        ))}
+                                    </Picker>
 
-  return (
-    <View style={styles.container}>
-       {renderHeader()}
-       <ScrollView style={styles.scrollViewStyle}>
+                                    <Text style={styles.minorHeadings}>Book of 50 vouchers x £1.00 vouchers</Text>
+                                    <Picker
+                                        selectedValue={quantities.quantity100x50p}
+                                        onValueChange={(itemValue) => handleQuantityChange('quantity100x50p', itemValue)}
+                                        style={styles.picker}
+                                    >
+                                        <Picker.Item label="Book Quantity" value="" />
+                                        {[...Array(51).keys()].map((i) => (
+                                            <Picker.Item key={i} label={`${i}`} value={i.toString()} />
+                                        ))}
+                                    </Picker>
+                                </>
+                            );
+                        case 'preprinted':
+                            return (
+                                <>
+                                    <Text style={styles.subHeading}>{item.title}</Text>
+                                    <Text style={styles.minorHeadings}>Book of 50 vouchers x £2.00 vouchers</Text>
+                                    <Picker
+                                        selectedValue={quantities.quantity50x2}
+                                        onValueChange={(itemValue) => handleQuantityChange('quantity50x2', itemValue)}
+                                        style={styles.picker}
+                                    >
+                                        <Picker.Item label="Book Quantity" value="" />
+                                        {[...Array(51).keys()].map((i) => (
+                                            <Picker.Item key={i} label={`${i}`} value={i.toString()} />
+                                        ))}
+                                    </Picker>
 
-      <Text style={styles.subHeading}>Pre-Paid vouchers</Text>
-      <Text style={styles.minorHeadings}>Book of 100 vouchers x 50p vouchers</Text>
-      <Picker
-            selectedValue={quantity50x50}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x50(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
+                                    <Text style={styles.minorHeadings}>Book of 50 vouchers x £3.00 vouchers</Text>
+                                    <Picker
+                                        selectedValue={quantities.quantity50x3}
+                                        onValueChange={(itemValue) => handleQuantityChange('quantity50x3', itemValue)}
+                                        style={styles.picker}
+                                    >
+                                        <Picker.Item label="Book Quantity" value="" />
+                                        {[...Array(51).keys()].map((i) => (
+                                            <Picker.Item key={i} label={`${i}`} value={i.toString()} />
+                                        ))}
+                                    </Picker>
 
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £1.00 vouchers</Text>
-      
-          <Picker
-            selectedValue={quantity100x50p}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity100x50p(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-          <Picker.Item label="Book Quantity" value="" />
-          {[...Array(51).keys()].map((i) => (
-            <Picker.Item key={i} label={`${i}`} value={i} />
-          ))}
-          </Picker>
-
-      <Text style={styles.subHeading}>Pre-Printed Voucher Books</Text>
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £2.00 vouchers</Text>
-            <Picker
-              selectedValue={quantity50x2}
-              onValueChange={(itemValue, itemIndex) => {
-                setQuantity50x2(itemValue);
-                calculateTotalFaceValue(); // Call this function after setting the state
-              }}
-              style={styles.picker}
-            >
-            <Picker.Item label="Book Quantity" value="" />
-            {[...Array(51).keys()].map((i) => (
-              <Picker.Item key={i} label={`${i}`} value={i} />
-            ))}
-          </Picker>
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £3.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x3}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x3(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £5.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x5}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x5(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £10.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x10}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x10(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £15.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x15}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x15(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £18.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x18}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x18(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £20.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x20}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x20(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £25.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x25}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x25(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £36.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x36}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x36(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £50.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x50}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x50(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £72.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x72}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x72(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-      <Text style={styles.minorHeadings}>Book of 50 vouchers x £100.00 vouchers</Text>
-          <Picker
-            selectedValue={quantity50x100}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x100(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-      <Text style={styles.subHeading}>Blank voucher books</Text>
-          <Picker
-            selectedValue={quantity50x0}
-            onValueChange={(itemValue, itemIndex) => {
-              setQuantity50x0(itemValue);
-              calculateTotalFaceValue(); // Call this function after setting the state
-            }}
-            style={styles.picker}
-          >
-        <Picker.Item label="Book Quantity" value="" />
-        {[...Array(51).keys()].map((i) => (
-          <Picker.Item key={i} label={`${i}`} value={i} />
-        ))}
-      </Picker>
-
-      {/* Add more options as needed */}
-      <Text style={styles.subHeading}>Order Total</Text>
-     
-      <TextInput
-        style={styles.input}
-        placeholder="Total face Value"
-        value={`£${totalFaceValue.toFixed(2)}`} // Format the value to two decimal places and add £ sign
-        editable={false}
-      />
-      <TextInput
-        style={styles.textArea}
-        placeholder="Any special instructions or requirements"
-        multiline
-        numberOfLines={4}
-        // onChangeText, value, etc.
-      />
-      <Button title="Order Books" onPress={handleOrder} />
-      </ScrollView>
-    </View>
-  );
-  }
-
+                                    {/* Render the rest of the Pre-Printed Voucher Books */}
+                                </>
+                            );
+                        case 'blank':
+                            return (
+                                <>
+                                    <Text style={styles.subHeading}>{item.title}</Text>
+                                    <Picker
+                                        selectedValue={quantities.quantity50x0}
+                                        onValueChange={(itemValue) => handleQuantityChange('quantity50x0', itemValue)}
+                                        style={styles.picker}
+                                    >
+                                        <Picker.Item label="Book Quantity" value="" />
+                                        {[...Array(51).keys()].map((i) => (
+                                            <Picker.Item key={i} label={`${i}`} value={i.toString()} />
+                                        ))}
+                                    </Picker>
+                                </>
+                            );
+                        case 'total':
+                            return (
+                                <>
+                                    <Text style={styles.subHeading}>{item.title}</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Total face Value"
+                                        value={`£${totalFaceValue.toFixed(2)}`}
+                                        editable={false}
+                                    />
+                                    <TextInput
+                                        style={styles.textArea}
+                                        placeholder="Any special instructions or requirements"
+                                        multiline
+                                        numberOfLines={4}
+                                    />
+                                    <Button title="Order Books" onPress={handleOrder} />
+                                </>
+                            );
+                        default:
+                            return null;
+                    }
+                }}
+                keyExtractor={(item) => item.key}
+            />
+        </View>
+    );
+}
 const styles = StyleSheet.create({
     cardInfoContainer: {
         height: 94,

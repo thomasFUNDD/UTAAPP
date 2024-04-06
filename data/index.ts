@@ -1,15 +1,18 @@
-import { icons, images } from "../constants"
-import BalanceContext from '../data/balancesContext';
+import React, { useContext } from 'react';
+import BalanceContext from './balancesContext';
+import OtherContext from './otherContext';
 
 export const userCards = [
-    {
-        id: "1",
-        number: "**** **** **** 2791",
-        balance: "4378.01",
-       
-    },
+  {
+    id: "1",
+    number: `**** **** **** ${useContext(OtherContext).panNumber}`,
+    balance: useContext(BalanceContext).currentBalance.toString(),
+  },
+];
 
-]
+
+console.log(useContext(BalanceContext).currentBalance);
+console.log(useContext(OtherContext).panNumber);
 
 export const allNotifications = [
  

@@ -1,21 +1,20 @@
 import React, { useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Modal, TouchableWithoutFeedback, TextInput, FlatList,StyleSheet,ScrollView ,ActivityIndicator } from 'react-native';
+import { StyleSheet,View, Text, TouchableOpacity, Modal, TouchableWithoutFeedback, TextInput, FlatList, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
-
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { API_URL, TOKEN } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from 'expo-router';
-
 import { Image } from 'expo-image';
-import Button from '../components/Button';
 import OtherContext from '../data/otherContext';
 import { Animated } from 'react-native';
-import { COLORS, SIZES,  images,icons } from '../constants';
-import { Calendar } from 'react-native-calendars';
+import { COLORS, SIZES, images, icons } from '../constants';
+
+const Button = React.lazy(() => import('../components/Button'));
+const Calendar = React.lazy(() => import('react-native-calendars').then(module => ({ default: module.Calendar })));
+
 const HistoryScreen = () => {
-  const { standingOrders, charities, accountDetails } = useContext(OtherContext);
+  const { standingOrders, charities, setCharities, uniqueCharities, setUniqueCharities, accountDetails } = useContext(OtherContext);
   const [filter, setFilter] = useState('active');
   const [expandedId, setExpandedId] = useState(null);
   const [selectedCharity, setSelectedCharity] = useState(null);
@@ -31,7 +30,7 @@ const HistoryScreen = () => {
   const [modalVisible, setDonationModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const navigation = useNavigation();
-  const [hasSelected, setHasSelected] = useState(false); // New state to track selection
+  const [searchQuery, setSearchQuery] = useState('');
 
   const formatDateForCalendar = useCallback((date) => {
     const year = date.getFullYear();
@@ -40,26 +39,23 @@ const HistoryScreen = () => {
     return `${year}-${month}-${day}`;
   }, []);
 
-
   const renderHeader = useCallback(() => {
     return (
       <View style={styles.headerContainer}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Image source={icons.back} contentFit='contain' style={styles.backIcon} />
         </TouchableOpacity>
-        <Text style={styles.title}>Donate</Text>
+        <Text style={styles.title}>Standing Orders</Text>
         <TouchableOpacity>
           <Image source={icons.more} contentFit='contain' style={styles.moreIcon} />
         </TouchableOpacity>
       </View>
     );
   }, [navigation]);
-  
 
-  const handleSelectDate = (newDate) => {
-    console.log(newDate);
-    setStartDate(newDate); // Assuming setStartDate updates the startDate state
-  };
+  const handleSelectDate = useCallback((newDate) => {
+    setStartDate(newDate);
+  }, []);
 
   const formatDate = useCallback((date) => {
     return date.toLocaleDateString('en-GB', {
@@ -68,8 +64,6 @@ const HistoryScreen = () => {
       year: 'numeric',
     });
   }, []);
-
-
 
   const addStandingOrder = useCallback(async () => {
     const token = await AsyncStorage.getItem('userToken');
@@ -85,19 +79,18 @@ const HistoryScreen = () => {
 
     const requestBody = {
       email: "user@example.com",
-      payments: parseInt(amount, 10), // Convert amount to a number
-      charityno: "756", // Use the numeric charity number
-      payon: formatDateForCalendar(selectedDate).replace(/-/g, ''), // Convert date to expected format
-      vaccountno: accountDetails.vaccountno, // Use vaccountno instead of donorid
+      payments: parseInt(amount, 10),
+      charityno: "756",
+      payon: formatDateForCalendar(selectedDate).replace(/-/g, ''),
+      vaccountno: accountDetails.vaccountno,
       bnksortcode: selectedBankAccount.bnk_sort_code,
       bnkaccountno: selectedBankAccount.bnk_account_no,
       mode: "ntimes",
-      ntimes: parseInt(numPayments, 10), // Convert ntimes to a number
+      ntimes: parseInt(numPayments, 10),
       frequency: frequency,
-      numPayments: parseInt(numPayments, 10), // Convert numPayments to a number
+      numPayments: parseInt(numPayments, 10),
       comments: comments
     };
-
 
     console.log(requestBody);
     console.log(requestBody);
@@ -134,10 +127,12 @@ const HistoryScreen = () => {
 
   const isActiveOrder = useCallback((order) => order.processed !== 'P', []);
 
-  const filteredOrders = useMemo(() => standingOrders.filter(order =>
-    (filter === 'active' ? isActiveOrder(order) : filter === 'inactive' ? !isActiveOrder(order) : true) &&
-    order.accountno == accountDetails.vaccountno
-  ), [standingOrders, filter, accountDetails.vaccountno, isActiveOrder]);
+  const filteredOrders = useMemo(() =>
+    standingOrders?.filter(order =>
+      (filter === 'active' ? isActiveOrder(order) : filter === 'inactive' ? !isActiveOrder(order) : true) &&
+      order.accountno == accountDetails.vaccountno
+    ), [standingOrders, filter, accountDetails.vaccountno, isActiveOrder]
+  );
 
   useEffect(() => {
     console.log('Selected Charity:', selectedCharity);
@@ -153,7 +148,7 @@ const HistoryScreen = () => {
 
   useEffect(() => {
     console.log(accountDetails);
-    if (selectedCharity) {
+    if (selectedCharity && charities) {
       const accounts = charities.filter(
         (charity) => charity.charity === selectedCharity
       ).map(charity => ({
@@ -167,7 +162,7 @@ const HistoryScreen = () => {
     }
   }, [selectedCharity, charities]);
 
-  const resetValues = () => {
+  const resetValues = useCallback(() => {
     setSelectedCharity(null);
     setSelectedBankAccount(null);
     setAmount('');
@@ -176,8 +171,18 @@ const HistoryScreen = () => {
     setNumPayments('');
     setComments('');
     setDonationModalVisible(false);
-  };
- 
+  }, []);
+
+  const filterCharities = useCallback((query) => {
+    return uniqueCharities.filter(charity =>
+      charity.charity.toLowerCase().includes(query.toLowerCase()) ||
+      (charity.regchar && charity.regchar.toString().toLowerCase().includes(query.toLowerCase()))
+    );
+  }, [uniqueCharities]);
+
+  const filteredCharitiesBySearch = useMemo(() => {
+    return filterCharities(searchQuery);
+  }, [filterCharities, searchQuery]);
 
   const renderDonationSuccessModal = useCallback(() => {
     return (
@@ -187,43 +192,42 @@ const HistoryScreen = () => {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Donation Successful</Text>
               <Text style={styles.modalText}>The donation will be sent once approved</Text>
-              <Button
-              title="Continue"
-              filled
-              onPress={() => resetValues()}
-              style={styles.modalButton}
-            />
+              <React.Suspense fallback={<ActivityIndicator />}>
+                <Button
+                  title="Continue"
+                  filled
+                  onPress={resetValues}
+                  style={styles.modalButton}
+                />
+              </React.Suspense>
             </View>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
     );
-  }, [modalVisible]);
+  }, [modalVisible, resetValues]);
 
-
-  const CustomDatePicker = ({ onSelectDate, startDate }) => {
-    // Use startDate if provided, otherwise default to today's date
+  const CustomDatePicker = useCallback(({ onSelectDate, startDate }) => {
     const initialDate = startDate ? formatDateForCalendar(new Date(startDate)) : formatDateForCalendar(new Date());
     const [selectedDay, setSelectedDay] = useState(initialDate);
     const [isVisible, setIsVisible] = useState(false);
-  
+
     const handleDayPress = (day) => {
       setSelectedDay(day.dateString);
-      onSelectDate(new Date(day.dateString)); // This updates the startDate in the parent component
-      setIsVisible(false); // Close the modal after selecting a date
+      onSelectDate(new Date(day.dateString));
+      setIsVisible(false);
     };
-  
+
     const openDatePicker = () => {
       setIsVisible(true);
     };
-  
+
     const closeDatePicker = () => {
       setIsVisible(false);
     };
-  
-    // Format the selectedDay for display
+
     const displayDate = selectedDay.split('-').reverse().join('/');
-  
+
     return (
       <>
         <TouchableOpacity onPress={openDatePicker}>
@@ -232,15 +236,15 @@ const HistoryScreen = () => {
         <Modal visible={isVisible} transparent={true} animationType="slide">
           <View style={styles.modalContainer}>
             <View style={styles.pickerContainer}>
-              <Calendar
-                current={selectedDay}
-                onDayPress={handleDayPress}
-                theme={{
-                  // Calendar theme styles
-                }}
-                enableSwipeMonths={true}
-                style={{ marginBottom: 40 }}
-              />
+              <React.Suspense fallback={<ActivityIndicator />}>
+                <Calendar
+                  current={selectedDay}
+                  onDayPress={handleDayPress}
+                  theme={{}}
+                  enableSwipeMonths={true}
+                  style={{ marginBottom: 40 }}
+                />
+              </React.Suspense>
               <TouchableOpacity
                 onPress={closeDatePicker}
                 style={styles.closeButton}
@@ -252,9 +256,9 @@ const HistoryScreen = () => {
         </Modal>
       </>
     );
-  };
+  }, [formatDateForCalendar]);
 
-  const resetStates = () => {
+  const resetStates = useCallback(() => {
     setSelectedCharity(null);
     setSelectedBankAccount(null);
     setFilteredBankAccounts([]);
@@ -266,20 +270,11 @@ const HistoryScreen = () => {
     setFrequency('W');
     setNumPayments('');
     setDonationModalVisible(false);
-    // Reset other states as needed
-  };
-  
+  }, []);
+
   const renderCharityPickerModal = useCallback(() => {
-    const filteredCharities = useMemo(
-      () => [
-        ...new Set(
-          charities.filter((charity) => charity.regchar !== 'Private').map((charity) => charity.charity)
-        ),
-      ],
-      [charities]
-    );
-  
     const [isCharityModalVisible, setCharityModalVisible] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const [slideAnim] = useState(new Animated.Value(0));
   
     const startSlideAnimation = () => {
@@ -304,15 +299,15 @@ const HistoryScreen = () => {
     const renderCharityItem = ({ item }) => (
       <TouchableOpacity
         style={styles.charityItem}
-        onPress={() => handleCharityPress(item)}
+        onPress={() => handleCharityPress(item.charity)}
       >
-        <Text style={styles.charityName}>{item}</Text>
+        <Text style={styles.charityName}>{item.charity}</Text>
       </TouchableOpacity>
     );
   
-    const handleOpenDatePicker = () => {
-      setShowCustomDatePicker(true);
-    };
+    const filteredCharitiesBySearch = useMemo(() => {
+      return filterCharities(searchQuery);
+    }, [filterCharities, searchQuery]);
   
     return (
       <Modal
@@ -322,7 +317,11 @@ const HistoryScreen = () => {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.overlayStyle}>
-          <View style={styles.modalView}>
+          <View style={[
+            styles.modalView,
+            selectedCharity ? { flex: 1, height: '90%' } : { height: '75%' }
+          ]}>
+            <Text style={styles.modalTitle}>Add Standing Order</Text>
             <ScrollView
               contentContainerStyle={styles.modalScrollView}
               showsVerticalScrollIndicator={false}
@@ -332,22 +331,33 @@ const HistoryScreen = () => {
               snapToEnd={false}
               snapToStart={true}
             >
-              {/* Charity picker */}
+              {!selectedCharity && (
+  <Text style={styles.standingOrderDescription}>
+    A standing order is an arrangement for regular charity donations, ensuring consistent support without manual intervention.
+  </Text>
+)}
+                  
               <Text style={styles.inputLabel}>Donate To:</Text>
-            <TouchableOpacity
-              style={[styles.charityButton, styles.inputContainer]}
-              onPress={() => setCharityModalVisible(true)}
-            >
-              <Text style={[styles.charityButtonText, { fontSize: 18, textAlign: 'center' }]}>
-                {selectedCharity || 'Select a charity'}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.charityButton, styles.inputContainer]}
+                onPress={() => setCharityModalVisible(true)}
+              >
+                <Text style={[styles.charityButtonText, { fontSize: 16, textAlign: 'center' }]}>
+                  {selectedCharity || 'Select a charity'}
+                </Text>
+              </TouchableOpacity>
               <Modal visible={isCharityModalVisible} animationType="slide">
                 <View style={styles.modalContainer}>
+                  <TextInput
+                    style={styles.searchBar}
+                    placeholder="Search by charity name or regchar"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
                   <FlatList
-                    data={filteredCharities}
+                    data={filteredCharitiesBySearch}
                     renderItem={renderCharityItem}
-                    keyExtractor={(item) => item}
+                    keyExtractor={(item) => item.charityno.toString()}
                     contentContainerStyle={styles.charityList}
                     style={{
                       flex: 1,
@@ -355,6 +365,7 @@ const HistoryScreen = () => {
                       height: '100%',
                     }}
                   />
+                
                   <TouchableOpacity
                     style={styles.closeButton}
                     onPress={() => setCharityModalVisible(false)}
@@ -363,8 +374,7 @@ const HistoryScreen = () => {
                   </TouchableOpacity>
                 </View>
               </Modal>
-  
-              {/* Other inputs */}
+
               {selectedCharity &&
               filteredBankAccounts.filter(
                 (account) => account.bnk_sort_code && account.bnk_account_no
@@ -378,7 +388,6 @@ const HistoryScreen = () => {
                     }),
                   }],
                 }]}>
-                  {/* Bank account picker */}
                   <Text style={styles.inputLabel}>Bank Account</Text>
                   <View style={styles.inputContainer}>
                     <Picker
@@ -401,7 +410,6 @@ const HistoryScreen = () => {
                     </Picker>
                   </View>
   
-                  {/* Amount input and other fields */}
                   {selectedBankAccount && (
                     <>
                       <Text style={styles.inputLabel}>Amount</Text>
@@ -416,7 +424,6 @@ const HistoryScreen = () => {
                         />
                       </View>
   
-                      {/* Start date picker */}
                       <Text style={styles.inputLabel}>Start Date</Text>
                       <View style={styles.inputContainer}>
                         <CustomDatePicker
@@ -425,7 +432,6 @@ const HistoryScreen = () => {
                         />
                       </View>
   
-                      {/* Frequency picker */}
                       <Text style={styles.inputLabel}>Frequency</Text>
                       <View style={styles.inputContainer}>
                         <Picker
@@ -436,11 +442,9 @@ const HistoryScreen = () => {
                           <Picker.Item label="Weekly" value="Weekly" />
                           <Picker.Item label="Monthly" value="Monthly" />
                           <Picker.Item label="Annually" value="Annually" />
-                          {/* ... other frequency options */}
                         </Picker>
                       </View>
   
-                      {/* Number of payments input */}
                       <Text style={styles.inputLabel}>Number of Payments</Text>
                       <View style={styles.inputContainer}>
                         <TextInput
@@ -452,7 +456,6 @@ const HistoryScreen = () => {
                         />
                       </View>
   
-                      {/* Payment reference input */}
                       <Text style={styles.inputLabel}>Payment Reference</Text>
                       <View style={styles.inputContainer}>
                         <TextInput
@@ -463,7 +466,6 @@ const HistoryScreen = () => {
                         />
                       </View>
   
-                      {/* Add standing order button */}
                       <TouchableOpacity
                         style={styles.addOrderButton}
                         onPress={addStandingOrder}
@@ -492,23 +494,16 @@ const HistoryScreen = () => {
               )}
             </ScrollView>
             <TouchableOpacity
-          style={styles.closeModalButton}
-          onPress={() => {
-            setModalVisible(false);
-            resetStates();
-          }}
-        >
-          <Text style={styles.closeModalButtonText}>Close</Text>
-        </TouchableOpacity>
+              style={styles.closeModalButton}
+              onPress={() => {
+                setModalVisible(false);
+                resetStates();
+              }}
+            >
+              <Text style={styles.closeModalButtonText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        {showCustomDatePicker && selectedBankAccount && (
-          <CustomDatePicker
-            isVisible={showCustomDatePicker}
-            onClose={() => setShowCustomDatePicker(false)}
-            onSelectDate={handleSelectDate}
-          />
-        )}
       </Modal>
     );
   }, [
@@ -525,7 +520,7 @@ const HistoryScreen = () => {
     addStandingOrder,
     handleSelectDate,
   ]);
-  //
+
   const sendCancellationEmail = useCallback(async (itemId) => {
     const item = standingOrders.find(order => order.id === itemId);
     if (!item) {
@@ -641,12 +636,19 @@ const HistoryScreen = () => {
           keyExtractor={(item) => item.id.toString()}
           extraData={expandedId}
           contentContainerStyle={{ paddingBottom: 120 }}
+          getItemLayout={(data, index) => ({
+            length: 100,
+            offset: 100 * index,
+            index,
+          })}
+          initialNumToRender={10}
+          maxToRenderPerBatch={5}
+          windowSize={10}
         />
         {renderDonationSuccessModal()}
       </SafeAreaView>
     </>
   );
-  
 };
 
 const styles = StyleSheet.create({
@@ -728,14 +730,14 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   modalView: {
-    flex: 1,
+    
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 35,
     alignItems: 'center',
     justifyContent: 'center',
     shadowOpacity: 0.9,
-    height: '50%',
+    height: '60%',
     width: '80%',
     alignSelf: 'center',
   },
@@ -745,7 +747,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 20,
-    width: '80%',
+    width: '90%',
     borderRadius: 5,
     alignSelf: 'center',
   },
@@ -809,10 +811,10 @@ const styles = StyleSheet.create({
     marginRight: 10,
     color: '#333',
   },
-
   overlayStyle: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center', // This will center the modal vertically
+    alignItems: 'center', // This will center the modal horizontally
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContainer: {
@@ -856,12 +858,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center", // Add this line to center the content vertically
     paddingHorizontal: 16,
+    paddingTop: 30,
     marginBottom: 16,
     backgroundColor: COLORS.primary,
-    height: 78,
+    height: 68,
   },
   backIcon: {
     height: 24,
@@ -944,13 +948,34 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
   },
+  standingOrderDescription: {
+    fontSize: 16, // Example size
+    color: '#333', // Dark grey color for the text
+    textAlign: 'center', // Center the text
+    marginHorizontal: 20, // Add horizontal margin
+    marginVertical: 10, // Add vertical margin
+    paddingBottom: 20,
+  },
   closeModalButtonText: {
     color: '#fff',
     fontWeight: '600',
     fontSize: 16,
   },
-  // ... other styles ...
+  // Adjusted styles for your first component's search bar
+searchBarContainer: {
+  paddingHorizontal: 24,
+  paddingVertical: 24, // increased vertical padding
+  backgroundColor: COLORS.primary, // Assuming COLORS.primary is defined elsewhere
+},
+searchBar: {
+  backgroundColor: 'white',
+  borderRadius: 8, // increased border radius for rounded corners
+  paddingHorizontal: 16, // more horizontal padding
+  paddingVertical: 12, // increased vertical padding
+  fontSize: 16, // slightly larger font size
+  height: 60, // increased height
+},
+
 });
 
 export default HistoryScreen;
-
